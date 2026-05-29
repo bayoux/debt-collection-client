@@ -11,7 +11,7 @@ const geist = Geist({
 })
 
 export const metadata: Metadata = {
-  title: "Debt Manager",
+  title: "Debt Collection",
   description: "Автоматизированная система управления дебиторской задолженностью",
 }
 

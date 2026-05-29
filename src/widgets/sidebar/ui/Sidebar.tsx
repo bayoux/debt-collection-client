@@ -114,7 +114,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <ShieldCheckIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Debt Manager</span>
+                  <span className="truncate font-semibold">Debt Collection</span>
                   <span className="truncate text-xs text-muted-foreground">
                     Управление долгами
                   </span>

@@ -19,7 +19,7 @@ const pageTitles: Record<string, string> = {
 function getTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname]
   const base = "/" + pathname.split("/")[1]
-  return pageTitles[base] ?? "Debt Manager"
+  return pageTitles[base] ?? "Debt Collection"
 }
 
 export function Header() {
