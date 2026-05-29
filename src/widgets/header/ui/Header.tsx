@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation"
 import { Separator } from "@/shared/components/ui/separator"
 import { SidebarTrigger } from "@/shared/components/ui/sidebar"
+import { CommandPalette } from "@/features/command-palette/ui/CommandPalette"
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Дашборд",
@@ -34,6 +35,9 @@ export function Header() {
           className="mx-1 data-[orientation=vertical]:h-4"
         />
         <h1 className="text-sm font-medium">{getTitle(pathname)}</h1>
+      </div>
+      <div className="ml-auto">
+        <CommandPalette />
       </div>
     </header>
   )
