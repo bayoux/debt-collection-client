@@ -4,13 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useState,
 } from "react"
 import { apiClient } from "@/shared/api/client"
 import type { User } from "@/entities/user/model/types"
 
-interface AuthUser extends Pick<User, "id" | "username" | "email"> {}
+type AuthUser = Pick<User, "id" | "username" | "email">
 
 interface AuthState {
   user: AuthUser | null
@@ -25,7 +24,7 @@ interface AuthActions {
 
 const AuthContext = createContext<AuthState & AuthActions>({
   user: null,
-  isLoading: true,
+  isLoading: false,
   isAuthenticated: false,
   login: async () => {},
   logout: async () => {},
@@ -57,19 +56,15 @@ function userFromToken(token: string): AuthUser | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
+  const [user, setUser] = useState<AuthUser | null>(() => {
     const token = apiClient.getAccessToken()
     if (!token || isTokenExpired(token)) {
       apiClient.clearTokens()
-      setIsLoading(false)
-      return
+      return null
     }
-    setUser(userFromToken(token))
-    setIsLoading(false)
-  }, [])
+    return userFromToken(token)
+  })
+  const [isLoading] = useState(false)
 
   const login = useCallback(async (username: string, password: string) => {
     const { access, refresh } = await apiClient.post<{
