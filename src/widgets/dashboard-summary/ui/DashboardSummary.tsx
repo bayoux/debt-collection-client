@@ -9,6 +9,7 @@ import {
   TriangleAlertIcon,
   DollarSignIcon,
   HandshakeIcon,
+  BellIcon,
 } from "lucide-react"
 import { reportApi } from "@/entities/report/api/report-api"
 import {
@@ -47,7 +48,7 @@ export function DashboardSummary() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <StatCardSkeleton key={i} />
         ))}
@@ -92,23 +93,30 @@ export function DashboardSummary() {
   const isOverdueHigh = data.total_overdue_cases > data.total_open_cases * 0.3
 
   return (
-    <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs sm:grid-cols-2 xl:grid-cols-4">
-      <Card className="@container/card">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Card
+        className="@container/card animate-fade-up bg-linear-to-t from-blue-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        style={{ "--delay": "0ms" } as React.CSSProperties}
+      >
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <BriefcaseIcon className="size-3.5" />
+            <span className="flex items-center justify-center rounded-md bg-blue-100 p-1 text-blue-600">
+              <BriefcaseIcon className="size-3.5" />
+            </span>
             Открытые дела
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {data.total_open_cases.toLocaleString("ru-RU")}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              {isOverdueHigh ? (
-                <TrendingDownIcon className="size-3" />
-              ) : (
-                <TrendingUpIcon className="size-3" />
-              )}
+            <Badge className={isOverdueHigh
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-blue-200 bg-blue-50 text-blue-700"
+            }>
+              {isOverdueHigh
+                ? <TrendingDownIcon className="size-3" />
+                : <TrendingUpIcon className="size-3" />
+              }
               {data.total_overdue_cases} просроч.
             </Badge>
           </CardAction>
@@ -116,7 +124,7 @@ export function DashboardSummary() {
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="flex gap-2 font-medium">
             Всего дел в работе
-            <BriefcaseIcon className="size-4" />
+            <BriefcaseIcon className="size-4 text-blue-400" />
           </div>
           <div className="text-muted-foreground">
             {data.total_overdue_cases} из {data.total_open_cases} просрочены
@@ -124,10 +132,15 @@ export function DashboardSummary() {
         </CardFooter>
       </Card>
 
-      <Card className="@container/card">
+      <Card
+        className="@container/card animate-fade-up bg-linear-to-t from-emerald-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        style={{ "--delay": "75ms" } as React.CSSProperties}
+      >
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <DollarSignIcon className="size-3.5" />
+            <span className="flex items-center justify-center rounded-md bg-emerald-100 p-1 text-emerald-600">
+              <DollarSignIcon className="size-3.5" />
+            </span>
             Общий долг
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -137,8 +150,14 @@ export function DashboardSummary() {
             </span>
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <TrendingUpIcon className="size-3" />
+            <Badge className={isGoodRate
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-amber-200 bg-amber-50 text-amber-700"
+            }>
+              {isGoodRate
+                ? <TrendingUpIcon className="size-3" />
+                : <TriangleAlertIcon className="size-3" />
+              }
               {data.collection_rate_percent}%
             </Badge>
           </CardAction>
@@ -146,11 +165,10 @@ export function DashboardSummary() {
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="flex gap-2 font-medium">
             {isGoodRate ? "Хорошая собираемость" : "Низкая собираемость"}
-            {isGoodRate ? (
-              <TrendingUpIcon className="size-4" />
-            ) : (
-              <TriangleAlertIcon className="size-4" />
-            )}
+            {isGoodRate
+              ? <TrendingUpIcon className="size-4 text-emerald-400" />
+              : <TriangleAlertIcon className="size-4 text-amber-400" />
+            }
           </div>
           <div className="text-muted-foreground">
             Процент сбора: {data.collection_rate_percent}%
@@ -158,17 +176,22 @@ export function DashboardSummary() {
         </CardFooter>
       </Card>
 
-      <Card className="@container/card">
+      <Card
+        className="@container/card animate-fade-up bg-linear-to-t from-amber-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        style={{ "--delay": "150ms" } as React.CSSProperties}
+      >
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <HandshakeIcon className="size-3.5" />
+            <span className="flex items-center justify-center rounded-md bg-amber-100 p-1 text-amber-600">
+              <HandshakeIcon className="size-3.5" />
+            </span>
             Обещания (PTP)
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {data.ptp_pending.toLocaleString("ru-RU")}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
+            <Badge className="border-amber-200 bg-amber-50 text-amber-700">
               <TrendingUpIcon className="size-3" />
               {data.ptp_kept_this_month} выполн.
             </Badge>
@@ -177,7 +200,7 @@ export function DashboardSummary() {
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="flex gap-2 font-medium">
             Ожидают исполнения
-            <HandshakeIcon className="size-4" />
+            <HandshakeIcon className="size-4 text-amber-400" />
           </div>
           <div className="text-muted-foreground">
             {data.ptp_kept_this_month} выполнено в этом месяце
@@ -185,14 +208,22 @@ export function DashboardSummary() {
         </CardFooter>
       </Card>
 
-      <Card className="@container/card">
+      <Card
+        className="@container/card animate-fade-up bg-linear-to-t from-violet-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        style={{ "--delay": "225ms" } as React.CSSProperties}
+      >
         <CardHeader>
-          <CardDescription>Уведомлений сегодня</CardDescription>
+          <CardDescription className="flex items-center gap-1.5">
+            <span className="flex items-center justify-center rounded-md bg-violet-100 p-1 text-violet-600">
+              <BellIcon className="size-3.5" />
+            </span>
+            Уведомлений сегодня
+          </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {data.notifications_sent_today.toLocaleString("ru-RU")}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
+            <Badge className="border-violet-200 bg-violet-50 text-violet-700">
               <TrendingUpIcon className="size-3" />
               Активно
             </Badge>
@@ -201,6 +232,7 @@ export function DashboardSummary() {
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="flex gap-2 font-medium">
             Отправлено сегодня
+            <BellIcon className="size-4 text-violet-400" />
           </div>
           <div className="text-muted-foreground">
             Через все каналы коммуникации

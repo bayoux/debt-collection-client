@@ -126,16 +126,41 @@ export function DebtorsPage() {
               </TableRow>
             ) : (
               data?.results.map((debtor) => (
-                <TableRow key={debtor.id}>
+                <TableRow
+                  key={debtor.id}
+                  className="transition-colors duration-150 hover:bg-primary/5"
+                >
                   <TableCell className="font-medium">{debtor.full_name}</TableCell>
-                  <TableCell>{debtor.phone}</TableCell>
-                  <TableCell>{debtor.email ?? "—"}</TableCell>
+                  <TableCell className="tabular-nums text-muted-foreground">
+                    {debtor.phone}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {debtor.email ?? "—"}
+                  </TableCell>
                   <TableCell>
                     {debtor.whatsapp_number ? (
-                      <Badge variant="secondary">✓ {debtor.whatsapp_number}</Badge>
-                    ) : "—"}
+                      <Badge
+                        variant="outline"
+                        className="border-green-200 bg-green-50 text-green-700"
+                      >
+                        ✓ {debtor.whatsapp_number}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
-                  <TableCell>{debtor.telegram_id ?? "—"}</TableCell>
+                  <TableCell>
+                    {debtor.telegram_id ? (
+                      <Badge
+                        variant="outline"
+                        className="border-sky-200 bg-sky-50 text-sky-700"
+                      >
+                        {debtor.telegram_id}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             )}

@@ -54,8 +54,8 @@ export function LoginForm() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
+    <div className="flex flex-col gap-6 animate-fade-up">
+      <Card className="bg-linear-to-b from-card to-primary/5 shadow-md">
         <CardHeader>
           <CardTitle>Вход в систему</CardTitle>
           <CardDescription>Управление дебиторской задолженностью</CardDescription>

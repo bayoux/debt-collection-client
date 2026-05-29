@@ -42,12 +42,49 @@ const statusLabels: Record<DebtCaseStatus, string> = {
   overdue: "Просрочено",
 }
 
-const statusVariants: Record<DebtCaseStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  new: "secondary",
-  in_progress: "default",
-  promised: "outline",
-  closed: "outline",
-  overdue: "destructive",
+const statusStyles: Record<DebtCaseStatus, string> = {
+  new: "border-slate-200 bg-slate-50 text-slate-600",
+  in_progress: "border-blue-200 bg-blue-50 text-blue-700",
+  promised: "border-amber-200 bg-amber-50 text-amber-700",
+  closed: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  overdue: "border-red-200 bg-red-50 text-red-700",
+}
+
+function getDpdStyle(dpd: number): string {
+  if (dpd > 60) return "text-destructive font-bold"
+  if (dpd > 30) return "text-orange-500 font-semibold"
+  if (dpd > 14) return "text-amber-500 font-medium"
+  return "text-muted-foreground"
+}
+
+function DueDateCell({ dateStr }: { dateStr: string }) {
+  const date = new Date(dateStr + "T00:00:00")
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((date.getTime() - now.getTime()) / 86_400_000)
+
+  const formatted = date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+
+  return (
+    <div>
+      <div className="text-sm">{formatted}</div>
+      {diffDays < 0 && (
+        <div className="text-[11px] font-medium text-destructive">
+          просрочено {Math.abs(diffDays)} дн.
+        </div>
+      )}
+      {diffDays === 0 && (
+        <div className="text-[11px] font-medium text-amber-500">сегодня</div>
+      )}
+      {diffDays > 0 && diffDays <= 14 && (
+        <div className="text-[11px] text-muted-foreground">через {diffDays} дн.</div>
+      )}
+    </div>
+  )
 }
 
 export function DebtCasesPage() {
@@ -144,25 +181,34 @@ export function DebtCasesPage() {
               </TableRow>
             ) : (
               data?.results.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50">
+                <TableRow
+                  key={c.id}
+                  className="cursor-pointer transition-colors duration-150 hover:bg-primary/5"
+                >
                   <TableCell>
-                    <Link href={`/debt-cases/${c.id}`} className="font-medium hover:underline">
+                    <Link
+                      href={`/debt-cases/${c.id}`}
+                      className="font-medium transition-colors hover:text-primary hover:underline"
+                    >
                       {c.debtor.full_name}
                     </Link>
                     <div className="text-xs text-muted-foreground">{c.debtor.phone}</div>
                   </TableCell>
-                  <TableCell className="font-mono">
-                    {c.amount.toLocaleString("ru-RU")} сом
+                  <TableCell className="font-mono tabular-nums">
+                    {c.amount.toLocaleString("ru-RU")}
+                    <span className="ml-0.5 text-xs text-muted-foreground">сом</span>
                   </TableCell>
                   <TableCell>
-                    <span className={c.dpd > 30 ? "text-destructive font-medium" : ""}>
-                      {c.dpd}
-                    </span>
+                    <span className={getDpdStyle(c.dpd)}>{c.dpd}</span>
                   </TableCell>
-                  <TableCell>{c.due_date}</TableCell>
-                  <TableCell>{c.assigned_agent?.username ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={statusVariants[c.status]}>
+                    <DueDateCell dateStr={c.due_date} />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {c.assigned_agent?.username ?? "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={statusStyles[c.status]}>
                       {statusLabels[c.status]}
                     </Badge>
                   </TableCell>
