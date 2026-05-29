@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { PlusIcon } from "lucide-react"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
@@ -33,6 +34,9 @@ import {
 import { Badge } from "@/shared/components/ui/badge"
 import { Skeleton } from "@/shared/components/ui/skeleton"
 import { QueryError } from "@/shared/components/ui/query-error"
+import { StatusCell } from "./StatusCell"
+
+// ─── config ───────────────────────────────────────────────────────────────────
 
 const statusLabels: Record<DebtCaseStatus, string> = {
   new: "Новое",
@@ -42,12 +46,12 @@ const statusLabels: Record<DebtCaseStatus, string> = {
   overdue: "Просрочено",
 }
 
-const statusStyles: Record<DebtCaseStatus, string> = {
-  new: "border-slate-200 bg-slate-50 text-slate-600",
+export const statusStyles: Record<DebtCaseStatus, string> = {
+  new:         "border-slate-200 bg-slate-50 text-slate-600",
   in_progress: "border-blue-200 bg-blue-50 text-blue-700",
-  promised: "border-amber-200 bg-amber-50 text-amber-700",
-  closed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  overdue: "border-red-200 bg-red-50 text-red-700",
+  promised:    "border-amber-200 bg-amber-50 text-amber-700",
+  closed:      "border-emerald-200 bg-emerald-50 text-emerald-700",
+  overdue:     "border-red-200 bg-red-50 text-red-700",
 }
 
 function getDpdStyle(dpd: number): string {
@@ -87,13 +91,42 @@ function DueDateCell({ dateStr }: { dateStr: string }) {
   )
 }
 
+// ─── page ─────────────────────────────────────────────────────────────────────
+
 export function DebtCasesPage() {
-  const [page, setPage] = useState(1)
-  const [status, setStatus] = useState<DebtCaseStatus | "all">("all")
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [createOpen, setCreateOpen] = useState(false)
 
+  const page   = Math.max(1, Number(searchParams.get("page") ?? "1"))
+  const status = (searchParams.get("status") as DebtCaseStatus | "all") ?? "all"
+
+  function setParam(key: string, value: string | null) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === null || value === "all") {
+      params.delete(key)
+    } else {
+      params.set(key, value)
+    }
+    if (key !== "page") params.delete("page")
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function setPage(next: number) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === 1) {
+      params.delete("page")
+    } else {
+      params.set("page", String(next))
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  const queryKey = ["debt-cases", page, status]
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["debt-cases", page, status],
+    queryKey,
     queryFn: () =>
       debtCaseApi.list({
         page,
@@ -102,9 +135,12 @@ export function DebtCasesPage() {
       }),
   })
 
+  const totalPages = data ? Math.ceil(data.count / 20) : 1
+
   return (
     <div className="space-y-4">
       {error && <QueryError error={error} />}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Дела о задолженности</h1>
@@ -131,10 +167,7 @@ export function DebtCasesPage() {
       <div className="flex gap-2">
         <Select
           value={status}
-          onValueChange={(v) => {
-            setStatus(v as DebtCaseStatus | "all")
-            setPage(1)
-          }}
+          onValueChange={(v) => setParam("status", v)}
         >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Все статусы" />
@@ -143,7 +176,9 @@ export function DebtCasesPage() {
             <SelectItem value="all">Все статусы</SelectItem>
             {Object.entries(statusLabels).map(([value, label]) => (
               <SelectItem key={value} value={value}>
-                {label}
+                <Badge variant="outline" className={statusStyles[value as DebtCaseStatus]}>
+                  {label}
+                </Badge>
               </SelectItem>
             ))}
           </SelectContent>
@@ -175,7 +210,7 @@ export function DebtCasesPage() {
               ))
             ) : data?.results.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   Дела не найдены
                 </TableCell>
               </TableRow>
@@ -208,9 +243,7 @@ export function DebtCasesPage() {
                     {c.assigned_agent?.username ?? "—"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={statusStyles[c.status]}>
-                      {statusLabels[c.status]}
-                    </Badge>
+                    <StatusCell caseId={c.id} status={c.status} queryKey={queryKey} />
                   </TableCell>
                 </TableRow>
               ))
@@ -221,11 +254,23 @@ export function DebtCasesPage() {
 
       {data && data.count > 20 && (
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={!data.previous}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={!data.previous}
+          >
             Назад
           </Button>
-          <span className="text-sm text-muted-foreground">Страница {page}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={!data.next}>
+          <span className="text-sm text-muted-foreground">
+            Страница {page} из {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(page + 1)}
+            disabled={!data.next}
+          >
             Вперёд
           </Button>
         </div>

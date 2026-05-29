@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { PlusIcon, UploadIcon, SearchIcon } from "lucide-react"
+import { PlusIcon, UploadIcon, SearchIcon, XIcon } from "lucide-react"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
 import { CreateDebtorForm } from "@/features/debtors/create/ui/CreateDebtorForm"
 import { ImportDebtorsForm } from "@/features/debtors/import/ui/ImportDebtorsForm"
@@ -28,25 +29,65 @@ import { Badge } from "@/shared/components/ui/badge"
 import { QueryError } from "@/shared/components/ui/query-error"
 
 export function DebtorsPage() {
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const router      = useRouter()
+  const pathname    = usePathname()
+  const searchParams = useSearchParams()
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["debtors", page, debouncedSearch],
-    queryFn: () => debtorApi.list({ page, page_size: 20, search: debouncedSearch }),
-  })
+  const page           = Math.max(1, Number(searchParams.get("page") ?? "1"))
+  const searchFromUrl  = searchParams.get("search") ?? ""
+
+  // Local input value updates instantly; URL update is debounced 400ms
+  const [inputValue, setInputValue] = useState(() => searchFromUrl)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setSearch(e.target.value)
-    setTimeout(() => setDebouncedSearch(e.target.value), 400)
+    const value = e.target.value
+    setInputValue(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (value) {
+        params.set("search", value)
+      } else {
+        params.delete("search")
+      }
+      params.delete("page")
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    }, 400)
   }
+
+  function clearSearch() {
+    setInputValue("")
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("search")
+    params.delete("page")
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function setPage(next: number) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === 1) {
+      params.delete("page")
+    } else {
+      params.set("page", String(next))
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["debtors", page, searchFromUrl],
+    queryFn: () =>
+      debtorApi.list({ page, page_size: 20, search: searchFromUrl }),
+  })
+
+  const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   return (
     <div className="space-y-4">
       {error && <QueryError error={error} />}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Должники</h1>
@@ -90,10 +131,19 @@ export function DebtorsPage() {
         <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
         <Input
           placeholder="Поиск по ФИО или телефону..."
-          className="pl-8"
-          value={search}
+          className="pl-8 pr-8"
+          value={inputValue}
           onChange={handleSearchChange}
         />
+        {inputValue && (
+          <button
+            onClick={clearSearch}
+            className="absolute right-2.5 top-2.5 text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Очистить поиск"
+          >
+            <XIcon className="size-4" />
+          </button>
+        )}
       </div>
 
       <div className="rounded-lg border">
@@ -120,8 +170,10 @@ export function DebtorsPage() {
               ))
             ) : data?.results.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  Должники не найдены
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  {searchFromUrl
+                    ? `Ничего не найдено по запросу «${searchFromUrl}»`
+                    : "Должники не найдены"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -173,18 +225,18 @@ export function DebtorsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage(Math.max(1, page - 1))}
             disabled={!data.previous}
           >
             Назад
           </Button>
           <span className="text-sm text-muted-foreground">
-            Страница {page}
+            Страница {page} из {totalPages}
           </span>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage(page + 1)}
             disabled={!data.next}
           >
             Вперёд
