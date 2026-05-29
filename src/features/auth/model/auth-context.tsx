@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useLayoutEffect,
   useState,
 } from "react"
 import { apiClient } from "@/shared/api/client"
@@ -24,7 +25,7 @@ interface AuthActions {
 
 const AuthContext = createContext<AuthState & AuthActions>({
   user: null,
-  isLoading: false,
+  isLoading: true,
   isAuthenticated: false,
   login: async () => {},
   logout: async () => {},
@@ -56,15 +57,27 @@ function userFromToken(token: string): AuthUser | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
+  // Start with isLoading=true so server and client render identically on first
+  // pass (both show skeleton). useLayoutEffect runs only on the client,
+  // resolves auth from localStorage before paint, and sets the real state.
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // One-time mount init from localStorage. localStorage is unavailable on the
+  // server, so we start with isLoading=true (identical on server and client)
+  // and resolve auth before first paint via useLayoutEffect.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useLayoutEffect(() => {
     const token = apiClient.getAccessToken()
     if (!token || isTokenExpired(token)) {
       apiClient.clearTokens()
-      return null
+      setUser(null)
+    } else {
+      setUser(userFromToken(token))
     }
-    return userFromToken(token)
-  })
-  const [isLoading] = useState(false)
+    setIsLoading(false)
+  }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(async (username: string, password: string) => {
     const { access, refresh } = await apiClient.post<{
