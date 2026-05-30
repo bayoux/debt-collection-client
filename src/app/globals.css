@@ -140,9 +140,26 @@
   }
 }
 
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @layer utilities {
   .animate-fade-up {
-    animation: fade-up 0.35s ease both;
+    animation: fade-up 0.3s ease both;
     animation-delay: var(--delay, 0ms);
+  }
+  .animate-fade-in {
+    animation: fade-in 0.2s ease both;
+    animation-delay: var(--delay, 0ms);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-in {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
