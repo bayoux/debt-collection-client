@@ -2,10 +2,22 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeftIcon, BellIcon, HandshakeIcon } from "lucide-react"
+import {
+  ArrowLeftIcon,
+  BellIcon,
+  HandshakeIcon,
+  DollarSignIcon,
+  CalendarIcon,
+  TrendingDownIcon,
+  PhoneIcon,
+  MailIcon,
+  MessageCircleIcon,
+  UserCheckIcon,
+  BarChart3Icon,
+} from "lucide-react"
 import Link from "next/link"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
-import type { DebtCaseStatus } from "@/entities/debt-case/model/types"
+import type { DebtCaseStatus, DPDSnapshot } from "@/entities/debt-case/model/types"
 import { SendNotificationForm } from "@/features/debt-cases/send-notification/ui/SendNotificationForm"
 import { CreatePtpForm } from "@/features/ptp/create/ui/CreatePtpForm"
 import { Button } from "@/shared/components/ui/button"
@@ -26,6 +38,9 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { Skeleton } from "@/shared/components/ui/skeleton"
+import { statusStyles } from "./DebtCasesPage"
+
+// ─── constants ────────────────────────────────────────────────────────────────
 
 const statusLabels: Record<DebtCaseStatus, string> = {
   new: "Новое",
@@ -34,6 +49,109 @@ const statusLabels: Record<DebtCaseStatus, string> = {
   closed: "Закрыто",
   overdue: "Просрочено",
 }
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase()
+}
+
+function dpdTheme(dpd: number) {
+  if (dpd > 60)
+    return {
+      card: "from-red-50/50 dark:from-red-950/30",
+      icon: "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400",
+      value: "text-destructive",
+    }
+  if (dpd > 30)
+    return {
+      card: "from-orange-50/50 dark:from-orange-950/30",
+      icon: "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400",
+      value: "text-orange-500",
+    }
+  if (dpd > 14)
+    return {
+      card: "from-amber-50/50 dark:from-amber-950/30",
+      icon: "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400",
+      value: "text-amber-500",
+    }
+  return {
+    card: "from-emerald-50/50 dark:from-emerald-950/30",
+    icon: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400",
+    value: "",
+  }
+}
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+      {getInitials(name)}
+    </div>
+  )
+}
+
+function DpdChart({ history }: { history: DPDSnapshot[] }) {
+  if (!history.length)
+    return <p className="text-sm text-muted-foreground">Нет данных</p>
+
+  const bars = history.slice(0, 14).reverse()
+  const max = Math.max(...bars.map((d) => d.dpd_value), 1)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex h-20 items-end gap-0.5">
+        {bars.map((snap, i) => {
+          const pct = Math.max(6, (snap.dpd_value / max) * 100)
+          const color =
+            snap.dpd_value > 60
+              ? "bg-destructive/70"
+              : snap.dpd_value > 30
+                ? "bg-orange-400/70"
+                : "bg-primary/40"
+          return (
+            <div
+              key={snap.id ?? i}
+              title={`${snap.snapshot_date}: ${snap.dpd_value} дн.`}
+              className={`flex-1 rounded-sm transition-all ${color}`}
+              style={{ height: `${pct}%` }}
+            />
+          )
+        })}
+      </div>
+
+      <div className="divide-y">
+        {history.slice(0, 6).map((snap) => (
+          <div key={snap.id} className="flex items-center justify-between py-1.5 text-sm">
+            <span className="text-muted-foreground">
+              {new Date(snap.snapshot_date).toLocaleDateString("ru-RU", {
+                day: "numeric",
+                month: "short",
+              })}
+            </span>
+            <span
+              className={`font-medium tabular-nums ${
+                snap.dpd_value > 60
+                  ? "text-destructive"
+                  : snap.dpd_value > 30
+                    ? "text-orange-500"
+                    : ""
+              }`}
+            >
+              {snap.dpd_value} дн.
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
   id: string
@@ -62,12 +180,23 @@ export function DebtCaseDetailPage({ id }: Props) {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-11 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-52" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+        <Skeleton className="h-14 w-full rounded-lg" />
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-32" />
+            <Skeleton key={i} className="h-28" />
           ))}
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-52" />
+          <Skeleton className="h-52" />
         </div>
       </div>
     )
@@ -75,140 +204,257 @@ export function DebtCaseDetailPage({ id }: Props) {
 
   if (!data) return <p className="text-muted-foreground">Дело не найдено.</p>
 
+  const dpd = dpdTheme(data.dpd)
+  const dueDate = new Date(data.due_date + "T00:00:00")
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((dueDate.getTime() - today.getTime()) / 86_400_000)
+  const dueDateFormatted = dueDate.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+  const createdFormatted = new Date(data.created_at).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+
+  const contactRows = [
+    { icon: UserCheckIcon, label: "ФИО",      value: data.debtor.full_name },
+    { icon: PhoneIcon,     label: "Телефон",  value: data.debtor.phone },
+    { icon: MailIcon,      label: "Email",    value: data.debtor.email ?? "—" },
+    { icon: MessageCircleIcon, label: "WhatsApp", value: data.debtor.whatsapp_number ?? "—" },
+    { icon: MessageCircleIcon, label: "Telegram", value: data.debtor.telegram_id ?? "—" },
+  ]
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex items-start gap-3">
         <Link href="/debt-cases">
-          <Button variant="ghost" size="icon-sm">
+          <Button variant="ghost" size="icon-sm" className="mt-1 shrink-0">
             <ArrowLeftIcon className="size-4" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {data.debtor.full_name}
-          </h1>
-          <p className="text-muted-foreground text-sm">{data.debtor.phone}</p>
+
+        <Avatar name={data.debtor.full_name} />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">
+              {data.debtor.full_name}
+            </h1>
+            <Badge variant="outline" className={statusStyles[data.status]}>
+              {statusLabels[data.status]}
+            </Badge>
+          </div>
+          <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted-foreground">
+            <span>{data.debtor.phone}</span>
+            <span>Создано: {createdFormatted}</span>
+            {data.assigned_agent && (
+              <span className="flex items-center gap-1">
+                <UserCheckIcon className="size-3" />
+                {data.assigned_agent.username}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      {/* ── Action bar ─────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3">
+        <span className="text-sm text-muted-foreground">Статус:</span>
         <Select
           value={data.status}
           onValueChange={(v) => updateStatus(v as DebtCaseStatus)}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="h-8 w-40 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {Object.entries(statusLabels).map(([value, label]) => (
               <SelectItem key={value} value={value}>
-                {label}
+                <Badge
+                  variant="outline"
+                  className={`${statusStyles[value as DebtCaseStatus]} text-xs`}
+                >
+                  {label}
+                </Badge>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Dialog open={sendOpen} onOpenChange={setSendOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <BellIcon className="mr-1.5 size-4" />
-              Отправить уведомление
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Отправить уведомление</DialogTitle>
-            </DialogHeader>
-            <SendNotificationForm debtCaseId={id} onSuccess={() => setSendOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <div className="ml-auto flex gap-2">
+          <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <BellIcon className="mr-1.5 size-3.5" />
+                Уведомление
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Отправить уведомление</DialogTitle>
+              </DialogHeader>
+              <SendNotificationForm
+                debtCaseId={id}
+                onSuccess={() => setSendOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
 
-        <Dialog open={ptpOpen} onOpenChange={setPtpOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <HandshakeIcon className="mr-1.5 size-4" />
-              Зафиксировать PTP
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Обещание об оплате</DialogTitle>
-            </DialogHeader>
-            <CreatePtpForm debtCaseId={id} onSuccess={() => setPtpOpen(false)} />
-          </DialogContent>
-        </Dialog>
+          <Dialog open={ptpOpen} onOpenChange={setPtpOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <HandshakeIcon className="mr-1.5 size-3.5" />
+                Зафиксировать PTP
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Обещание об оплате</DialogTitle>
+              </DialogHeader>
+              <CreatePtpForm debtCaseId={id} onSuccess={() => setPtpOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+      {/* ── Metric cards ───────────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+        <Card className="bg-linear-to-t from-emerald-50/50 to-card shadow-xs dark:from-emerald-950/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Сумма долга</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Сумма долга
+              </CardTitle>
+              <span className="flex items-center justify-center rounded-md bg-emerald-100 p-1.5 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400">
+                <DollarSignIcon className="size-3.5" />
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold">{data.amount.toLocaleString("ru-RU")} сом</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">DPD</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-xl font-bold ${data.dpd > 30 ? "text-destructive" : ""}`}>
-              {data.dpd} дней
+            <p className="text-2xl font-bold tabular-nums">
+              {data.amount.toLocaleString("ru-RU")}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">сом</span>
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Дата погашения</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xl font-bold">{data.due_date}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Статус</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge>{statusLabels[data.status]}</Badge>
-          </CardContent>
-        </Card>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Должник</CardTitle>
+        <Card className={`bg-linear-to-t ${dpd.card} to-card shadow-xs`}>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">DPD</CardTitle>
+              <span className={`flex items-center justify-center rounded-md p-1.5 ${dpd.icon}`}>
+                <TrendingDownIcon className="size-3.5" />
+              </span>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p><span className="text-muted-foreground">ФИО:</span> {data.debtor.full_name}</p>
-            <p><span className="text-muted-foreground">Телефон:</span> {data.debtor.phone}</p>
-            <p><span className="text-muted-foreground">Email:</span> {data.debtor.email ?? "—"}</p>
-            <p><span className="text-muted-foreground">WhatsApp:</span> {data.debtor.whatsapp_number ?? "—"}</p>
-            <p><span className="text-muted-foreground">Telegram:</span> {data.debtor.telegram_id ?? "—"}</p>
+          <CardContent>
+            <p className={`text-2xl font-bold tabular-nums ${dpd.value}`}>
+              {data.dpd}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">дней</span>
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">История DPD</CardTitle>
+        <Card className="bg-linear-to-t from-blue-50/50 to-card shadow-xs dark:from-blue-950/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Дата погашения
+              </CardTitle>
+              <span className="flex items-center justify-center rounded-md bg-blue-100 p-1.5 text-blue-600 dark:bg-blue-900 dark:text-blue-400">
+                <CalendarIcon className="size-3.5" />
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
-            {dpdHistory?.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Нет данных</p>
-            ) : (
-              <div className="space-y-1">
-                {dpdHistory?.slice(0, 10).map((snap) => (
-                  <div key={snap.id} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">{snap.snapshot_date}</span>
-                    <span className="font-medium">{snap.dpd_value} дн.</span>
-                  </div>
-                ))}
-              </div>
+            <p className="text-base font-bold leading-snug">{dueDateFormatted}</p>
+            {diffDays < 0 && (
+              <p className="mt-0.5 text-xs font-medium text-destructive">
+                просрочено {Math.abs(diffDays)} дн.
+              </p>
+            )}
+            {diffDays === 0 && (
+              <p className="mt-0.5 text-xs font-medium text-amber-500">срок сегодня</p>
+            )}
+            {diffDays > 0 && diffDays <= 30 && (
+              <p className="mt-0.5 text-xs text-muted-foreground">через {diffDays} дн.</p>
             )}
           </CardContent>
         </Card>
+
+        <Card className="bg-linear-to-t from-violet-50/50 to-card shadow-xs dark:from-violet-950/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Агент</CardTitle>
+              <span className="flex items-center justify-center rounded-md bg-violet-100 p-1.5 text-violet-600 dark:bg-violet-900 dark:text-violet-400">
+                <UserCheckIcon className="size-3.5" />
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {data.assigned_agent ? (
+              <p className="truncate text-base font-bold">
+                {data.assigned_agent.username}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Не назначен</p>
+            )}
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* ── Info section ───────────────────────────────────────────────── */}
+      <div className="grid gap-4 md:grid-cols-2">
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="flex items-center justify-center rounded-md bg-muted p-1">
+                <UserCheckIcon className="size-3.5 text-muted-foreground" />
+              </span>
+              Должник
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-0 divide-y">
+            {contactRows.map(({ icon: Icon, label, value }) => (
+              <div
+                key={label}
+                className="flex items-center gap-3 py-2 text-sm"
+              >
+                <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+                <span className="truncate font-medium">{value}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="flex items-center justify-center rounded-md bg-muted p-1">
+                <BarChart3Icon className="size-3.5 text-muted-foreground" />
+              </span>
+              История DPD
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!dpdHistory ? (
+              <Skeleton className="h-24 w-full" />
+            ) : (
+              <DpdChart history={dpdHistory} />
+            )}
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   )

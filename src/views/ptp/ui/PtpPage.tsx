@@ -1,20 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import Link from "next/link"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { CircleCheckIcon, CircleXIcon } from "lucide-react"
+import {
+  CircleCheckIcon,
+  CircleXIcon,
+  HandshakeIcon,
+  ClockIcon,
+  CheckCircle2Icon,
+  XCircleIcon,
+  type LucideIcon,
+} from "lucide-react"
 import { ptpApi } from "@/entities/ptp/api/ptp-api"
-import type { PTPStatus } from "@/entities/ptp/model/types"
+import type { PTPStatus, PTPRecord } from "@/entities/ptp/model/types"
 import { Button } from "@/shared/components/ui/button"
 import { Badge } from "@/shared/components/ui/badge"
 import { QueryError } from "@/shared/components/ui/query-error"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select"
 import {
   Table,
   TableBody,
@@ -25,22 +27,183 @@ import {
 } from "@/shared/components/ui/table"
 import { Skeleton } from "@/shared/components/ui/skeleton"
 
-const statusLabels: Record<PTPStatus, string> = {
-  pending: "Ожидает",
-  kept: "Выполнено",
-  broken: "Нарушено",
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const statusConfig: Record<PTPStatus, { label: string; cls: string }> = {
+  pending: {
+    label: "Ожидает",
+    cls: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  },
+  kept: {
+    label: "Выполнено",
+    cls: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  },
+  broken: {
+    label: "Нарушено",
+    cls: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+  },
 }
 
-const statusVariants: Record<PTPStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  pending: "secondary",
-  kept: "default",
-  broken: "destructive",
+const FILTERS: { value: PTPStatus | "all"; label: string; icon: LucideIcon }[] = [
+  { value: "all",     label: "Все",       icon: HandshakeIcon    },
+  { value: "pending", label: "Ожидает",   icon: ClockIcon        },
+  { value: "kept",    label: "Выполнено", icon: CheckCircle2Icon },
+  { value: "broken",  label: "Нарушено",  icon: XCircleIcon      },
+]
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+function AgentAvatar({ username }: { username: string }) {
+  const initials = username.slice(0, 2).toUpperCase()
+  return (
+    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+      {initials}
+    </div>
+  )
 }
+
+function PromiseDateCell({
+  dateStr,
+  status,
+}: {
+  dateStr: string
+  status: PTPStatus
+}) {
+  const date = new Date(dateStr + "T00:00:00")
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diff = Math.round((date.getTime() - today.getTime()) / 86_400_000)
+  const formatted = date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+
+  return (
+    <div>
+      <div className="text-sm">{formatted}</div>
+      {status === "pending" && (
+        <>
+          {diff < 0 && (
+            <div className="mt-0.5 text-[11px] font-medium text-destructive">
+              просрочено {Math.abs(diff)} дн.
+            </div>
+          )}
+          {diff === 0 && (
+            <div className="mt-0.5 text-[11px] font-medium text-amber-500">
+              сегодня
+            </div>
+          )}
+          {diff > 0 && diff <= 7 && (
+            <div className="mt-0.5 text-[11px] text-amber-500">
+              через {diff} дн.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function RowActions({
+  ptp,
+  onUpdate,
+}: {
+  ptp: PTPRecord
+  onUpdate: (id: string, status: "kept" | "broken") => void
+}) {
+  if (ptp.status !== "pending") {
+    return (
+      <div className="flex items-center gap-1.5">
+        {ptp.status === "kept" ? (
+          <CheckCircle2Icon className="size-4 text-emerald-500" />
+        ) : (
+          <XCircleIcon className="size-4 text-destructive" />
+        )}
+        <span className="text-xs text-muted-foreground">
+          {ptp.status === "kept" ? "Выполнено" : "Нарушено"}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1.5 text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:border-emerald-700 dark:hover:bg-emerald-950 dark:hover:text-emerald-300"
+        onClick={() => onUpdate(ptp.id, "kept")}
+      >
+        <CircleCheckIcon className="size-3.5" />
+        Выполнено
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1.5 text-destructive hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:hover:border-red-800 dark:hover:bg-red-950 dark:hover:text-red-300"
+        onClick={() => onUpdate(ptp.id, "broken")}
+      >
+        <CircleXIcon className="size-3.5" />
+        Нарушено
+      </Button>
+    </div>
+  )
+}
+
+function EmptyState({ status }: { status: PTPStatus | "all" }) {
+  const label =
+    status === "all"
+      ? "Обещаний нет"
+      : `Нет обещаний со статусом «${statusConfig[status as PTPStatus]?.label ?? status}»`
+  return (
+    <TableRow>
+      <TableCell colSpan={5}>
+        <div className="flex flex-col items-center gap-2 py-14 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <HandshakeIcon className="size-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground">
+            Обещания создаются со страницы дела
+          </p>
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+// ─── page ─────────────────────────────────────────────────────────────────────
 
 export function PtpPage() {
-  const qc = useQueryClient()
-  const [page, setPage] = useState(1)
-  const [status, setStatus] = useState<PTPStatus | "all">("all")
+  const router       = useRouter()
+  const pathname     = usePathname()
+  const searchParams = useSearchParams()
+  const qc           = useQueryClient()
+
+  const page   = Math.max(1, Number(searchParams.get("page") ?? "1"))
+  const status = (searchParams.get("status") ?? "all") as PTPStatus | "all"
+
+  function setParam(key: string, value: string | null) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (!value || value === "all") {
+      params.delete(key)
+    } else {
+      params.set(key, value)
+    }
+    if (key !== "page") params.delete("page")
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function setPage(next: number) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === 1) {
+      params.delete("page")
+    } else {
+      params.set("page", String(next))
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["ptp", page, status],
@@ -58,42 +221,55 @@ export function PtpPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ptp"] }),
   })
 
+  const totalPages = data ? Math.ceil(data.count / 20) : 1
+
   return (
     <div className="space-y-4">
       {error && <QueryError error={error} />}
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Обещания об оплате (PTP)</h1>
-          <p className="text-muted-foreground">
-            {data ? `Всего: ${data.count}` : "Загрузка..."}
+          <h1 className="text-2xl font-bold tracking-tight">Обещания об оплате</h1>
+          <p className="text-sm text-muted-foreground">
+            {data ? `${data.count.toLocaleString("ru-RU")} записей` : "Загрузка..."}
           </p>
         </div>
       </div>
 
-      <Select
-        value={status}
-        onValueChange={(v) => {
-          setStatus(v as PTPStatus | "all")
-          setPage(1)
-        }}
-      >
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="Все статусы" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Все статусы</SelectItem>
-          {Object.entries(statusLabels).map(([value, label]) => (
-            <SelectItem key={value} value={value}>{label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* ── Filter tabs ────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-1.5 rounded-lg border bg-muted/30 p-1">
+        {FILTERS.map(({ value, label, icon: Icon }) => {
+          const active = status === value
+          return (
+            <button
+              key={value}
+              onClick={() => setParam("status", value)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+                active
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="size-3.5" />
+              {label}
+              {active && data && (
+                <span className="ml-0.5 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary">
+                  {data.count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
 
+      {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Агент</TableHead>
-              <TableHead>Обещанная сумма</TableHead>
+              <TableHead>Сумма</TableHead>
               <TableHead>Дата обещания</TableHead>
               <TableHead>Статус</TableHead>
               <TableHead>Действия</TableHead>
@@ -103,51 +279,64 @@ export function PtpPage() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 5 }).map((_, j) => (
-                    <TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>
-                  ))}
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="size-7 rounded-full" />
+                      <Skeleton className="h-3.5 w-24" />
+                    </div>
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-7 w-32" /></TableCell>
                 </TableRow>
               ))
             ) : data?.results.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  Нет обещаний
-                </TableCell>
-              </TableRow>
+              <EmptyState status={status} />
             ) : (
               data?.results.map((ptp) => (
-                <TableRow key={ptp.id}>
-                  <TableCell>{ptp.agent.username}</TableCell>
-                  <TableCell className="font-mono">
-                    {ptp.promised_amount.toLocaleString("ru-RU")} сом
-                  </TableCell>
-                  <TableCell>{ptp.promise_date}</TableCell>
+                <TableRow
+                  key={ptp.id}
+                  className="transition-colors duration-150 hover:bg-primary/5"
+                >
                   <TableCell>
-                    <Badge variant={statusVariants[ptp.status]}>
-                      {statusLabels[ptp.status]}
+                    <div className="flex items-center gap-2">
+                      <AgentAvatar username={ptp.agent.username} />
+                      <div>
+                        <div className="text-sm font-medium">{ptp.agent.username}</div>
+                        <Link
+                          href={`/debt-cases/${ptp.debt_case_id}`}
+                          className="text-[11px] text-muted-foreground hover:text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Дело #{ptp.debt_case_id.slice(0, 8)}
+                        </Link>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono tabular-nums">
+                    {ptp.promised_amount.toLocaleString("ru-RU")}
+                    <span className="ml-0.5 text-xs text-muted-foreground">сом</span>
+                  </TableCell>
+                  <TableCell>
+                    <PromiseDateCell
+                      dateStr={ptp.promise_date}
+                      status={ptp.status}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={statusConfig[ptp.status].cls}
+                    >
+                      {statusConfig[ptp.status].label}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {ptp.status === "pending" && (
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-green-600"
-                          onClick={() => updateStatus({ id: ptp.id, status: "kept" })}
-                        >
-                          <CircleCheckIcon className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-destructive"
-                          onClick={() => updateStatus({ id: ptp.id, status: "broken" })}
-                        >
-                          <CircleXIcon className="size-4" />
-                        </Button>
-                      </div>
-                    )}
+                    <RowActions
+                      ptp={ptp}
+                      onUpdate={(id, s) => updateStatus({ id, status: s })}
+                    />
                   </TableCell>
                 </TableRow>
               ))
@@ -156,15 +345,42 @@ export function PtpPage() {
         </Table>
       </div>
 
+      {/* ── Pagination ─────────────────────────────────────────────────── */}
       {data && data.count > 20 && (
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={!data.previous}>
-            Назад
-          </Button>
-          <span className="text-sm text-muted-foreground">Страница {page}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={!data.next}>
-            Вперёд
-          </Button>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            Страница {page} из {totalPages}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={!data.previous}
+            >
+              Назад
+            </Button>
+            {totalPages <= 7 &&
+              Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  className="w-8"
+                  onClick={() => setPage(p)}
+                >
+                  {p}
+                </Button>
+              ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(page + 1)}
+              disabled={!data.next}
+            >
+              Вперёд
+            </Button>
+          </div>
         </div>
       )}
     </div>

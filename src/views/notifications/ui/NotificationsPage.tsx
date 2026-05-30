@@ -30,6 +30,13 @@ import {
   DialogTrigger,
 } from "@/shared/components/ui/dialog"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select"
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -51,70 +58,94 @@ import {
 import { Skeleton } from "@/shared/components/ui/skeleton"
 import { QueryError } from "@/shared/components/ui/query-error"
 
-// ─── channel config ──────────────────────────────────────────────────────────
+// ─── channel config ───────────────────────────────────────────────────────────
 
-type ChannelConfig = { label: string; icon: LucideIcon; className: string }
-
-const channelConfig: Record<NotificationChannel, ChannelConfig> = {
-  sms:      { label: "SMS",      icon: MessageSquareIcon, className: "border-blue-200   bg-blue-50   text-blue-700"   },
-  whatsapp: { label: "WhatsApp", icon: MessageCircleIcon, className: "border-green-200  bg-green-50  text-green-700"  },
-  telegram: { label: "Telegram", icon: SendIcon,          className: "border-sky-200    bg-sky-50    text-sky-700"    },
-  email:    { label: "Email",    icon: MailIcon,          className: "border-orange-200 bg-orange-50 text-orange-700" },
+type ChannelConfig = {
+  label: string
+  icon: LucideIcon
+  badgeCls: string
+  iconCls: string
+  cardCls: string
 }
 
+const channelConfig: Record<NotificationChannel, ChannelConfig> = {
+  sms: {
+    label:    "SMS",
+    icon:     MessageSquareIcon,
+    badgeCls: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
+    iconCls:  "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400",
+    cardCls:  "from-blue-50/50 dark:from-blue-950/20",
+  },
+  whatsapp: {
+    label:    "WhatsApp",
+    icon:     MessageCircleIcon,
+    badgeCls: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300",
+    iconCls:  "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400",
+    cardCls:  "from-green-50/50 dark:from-green-950/20",
+  },
+  telegram: {
+    label:    "Telegram",
+    icon:     SendIcon,
+    badgeCls: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300",
+    iconCls:  "bg-sky-100 text-sky-600 dark:bg-sky-900 dark:text-sky-400",
+    cardCls:  "from-sky-50/50 dark:from-sky-950/20",
+  },
+  email: {
+    label:    "Email",
+    icon:     MailIcon,
+    badgeCls: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300",
+    iconCls:  "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400",
+    cardCls:  "from-orange-50/50 dark:from-orange-950/20",
+  },
+}
+
+// ─── log status config ────────────────────────────────────────────────────────
+
+type StatusConfig = { label: string; icon: LucideIcon; cls: string }
+
+const statusConfig: Record<NotificationLogStatus, StatusConfig> = {
+  queued:    { label: "В очереди",  icon: ClockIcon,      cls: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"       },
+  sent:      { label: "Отправлено", icon: SendIcon,        cls: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"             },
+  delivered: { label: "Доставлено", icon: CheckCheckIcon,  cls: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
+  failed:    { label: "Ошибка",     icon: XCircleIcon,     cls: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"                   },
+}
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
 function ChannelBadge({ channel }: { channel: NotificationChannel }) {
-  const { label, icon: Icon, className } = channelConfig[channel]
+  const { label, icon: Icon, badgeCls } = channelConfig[channel]
   return (
-    <Badge variant="outline" className={className}>
+    <Badge variant="outline" className={badgeCls}>
       <Icon className="size-3" />
       {label}
     </Badge>
   )
-}
-
-// ─── log status config ───────────────────────────────────────────────────────
-
-type StatusConfig = { label: string; icon: LucideIcon; className: string }
-
-const statusConfig: Record<NotificationLogStatus, StatusConfig> = {
-  queued:    { label: "В очереди",  icon: ClockIcon,      className: "border-slate-200   bg-slate-50   text-slate-600"   },
-  sent:      { label: "Отправлено", icon: SendIcon,        className: "border-blue-200    bg-blue-50    text-blue-700"    },
-  delivered: { label: "Доставлено", icon: CheckCheckIcon,  className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  failed:    { label: "Ошибка",     icon: XCircleIcon,     className: "border-red-200     bg-red-50     text-red-700"     },
 }
 
 function StatusBadge({ status }: { status: NotificationLogStatus }) {
-  const { label, icon: Icon, className } = statusConfig[status]
+  const { label, icon: Icon, cls } = statusConfig[status]
   return (
-    <Badge variant="outline" className={className}>
+    <Badge variant="outline" className={cls}>
       <Icon className="size-3" />
       {label}
     </Badge>
   )
 }
 
-// ─── date helper ─────────────────────────────────────────────────────────────
-
-function formatLogDate(dateStr: string | null): { primary: string; secondary?: string } {
+function formatLogDate(dateStr: string | null) {
   if (!dateStr) return { primary: "—" }
-
   const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / 86_400_000)
-  const timeStr = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
-
-  if (diffDays === 0) return { primary: timeStr, secondary: "сегодня" }
-  if (diffDays === 1) return { primary: timeStr, secondary: "вчера" }
-  if (diffDays < 7)   return { primary: timeStr, secondary: `${diffDays} дн. назад` }
-
+  const now   = new Date()
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000)
+  const timeStr  = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+  if (diffDays === 0) return { primary: timeStr,  secondary: "сегодня" }
+  if (diffDays === 1) return { primary: timeStr,  secondary: "вчера"   }
+  if (diffDays < 7)   return { primary: timeStr,  secondary: `${diffDays} дн. назад` }
   return {
-    primary: date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
+    primary:   date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
     secondary: timeStr,
   }
 }
-
-// ─── empty state ─────────────────────────────────────────────────────────────
 
 function EmptyState({
   icon: Icon,
@@ -129,7 +160,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="rounded-full bg-muted p-3">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
         <Icon className="size-5 text-muted-foreground" />
       </div>
       <div>
@@ -141,22 +172,22 @@ function EmptyState({
   )
 }
 
-// ─── template card ────────────────────────────────────────────────────────────
-
 function TemplateCardSkeleton() {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-5 w-20" />
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-3">
+          <Skeleton className="size-8 rounded-lg shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-5 w-10 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-4/5" />
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <Skeleton className="h-3 w-full mb-1" />
-        <Skeleton className="h-3 w-4/5 mb-1" />
-        <Skeleton className="h-3 w-3/5" />
-      </CardContent>
     </Card>
   )
 }
@@ -165,7 +196,9 @@ function TemplateCardSkeleton() {
 
 export function NotificationsPage() {
   const [createOpen, setCreateOpen] = useState(false)
-  const [logsPage, setLogsPage] = useState(1)
+  const [logsPage,   setLogsPage]   = useState(1)
+  const [logChannel, setLogChannel] = useState<NotificationChannel | "all">("all")
+  const [logStatus,  setLogStatus]  = useState<NotificationLogStatus | "all">("all")
 
   const {
     data: templates,
@@ -181,12 +214,28 @@ export function NotificationsPage() {
     isLoading: logsLoading,
     error: logsError,
   } = useQuery({
-    queryKey: ["notification-logs", logsPage],
-    queryFn: () => notificationApi.logs.list({ page: logsPage, page_size: 20 }),
+    queryKey: ["notification-logs", logsPage, logChannel, logStatus],
+    queryFn: () =>
+      notificationApi.logs.list({
+        page:     logsPage,
+        page_size: 20,
+        channel: logChannel === "all" ? undefined : logChannel,
+        status:  logStatus  === "all" ? undefined : logStatus,
+      }),
   })
 
   const templateCount = templates?.length ?? 0
-  const logCount = logs?.count ?? 0
+  const logCount      = logs?.count ?? 0
+  const totalLogPages = logs ? Math.ceil(logs.count / 20) : 1
+
+  function handleLogChannel(v: string) {
+    setLogChannel(v as NotificationChannel | "all")
+    setLogsPage(1)
+  }
+  function handleLogStatus(v: string) {
+    setLogStatus(v as NotificationLogStatus | "all")
+    setLogsPage(1)
+  }
 
   return (
     <div className="space-y-4">
@@ -194,17 +243,18 @@ export function NotificationsPage() {
         <QueryError error={templatesError ?? logsError} />
       )}
 
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Уведомления</h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Шаблоны и лог отправленных уведомлений
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <PlusIcon className="mr-1.5 size-4" />
+            <Button size="sm">
+              <PlusIcon className="mr-1.5 size-3.5" />
               Новый шаблон
             </Button>
           </DialogTrigger>
@@ -237,7 +287,7 @@ export function NotificationsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Templates tab ── */}
+        {/* ── Templates tab ──────────────────────────────────────────── */}
         <TabsContent value="templates" className="mt-4">
           {templatesLoading ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -251,11 +301,7 @@ export function NotificationsPage() {
               title="Шаблоны не найдены"
               description="Создайте первый шаблон уведомления"
               action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCreateOpen(true)}
-                >
+                <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
                   <PlusIcon className="mr-1.5 size-3.5" />
                   Создать шаблон
                 </Button>
@@ -263,50 +309,105 @@ export function NotificationsPage() {
             />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {templates?.map((t) => (
-                <Card
-                  key={t.id}
-                  className="animate-fade-up transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-medium leading-tight">
-                        {t.name}
-                      </span>
-                      <div className="flex shrink-0 gap-1">
-                        <ChannelBadge channel={t.channel} />
-                        <Badge
-                          variant="outline"
-                          className="border-slate-200 bg-slate-50 text-slate-500 text-[11px]"
-                        >
-                          {t.language.toUpperCase()}
-                        </Badge>
+              {templates?.map((t) => {
+                const ch = channelConfig[t.channel]
+                const Icon = ch.icon
+                return (
+                  <Card
+                    key={t.id}
+                    className={`bg-linear-to-t ${ch.cardCls} to-card animate-fade-up shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start gap-3">
+                        <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${ch.iconCls}`}>
+                          <Icon className="size-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-sm font-medium leading-tight">
+                              {t.name}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 text-[10px] border-border/60 bg-muted/60 text-muted-foreground"
+                            >
+                              {t.language.toUpperCase()}
+                            </Badge>
+                          </div>
+                          <div className="mt-1">
+                            <ChannelBadge channel={t.channel} />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <p className="line-clamp-3 cursor-default text-xs text-muted-foreground">
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="line-clamp-2 cursor-default text-xs text-muted-foreground">
+                            {t.body}
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="bottom"
+                          className="max-w-xs whitespace-pre-wrap text-xs"
+                        >
                           {t.body}
-                        </p>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="bottom"
-                        className="max-w-xs whitespace-pre-wrap text-xs"
-                      >
-                        {t.body}
-                      </TooltipContent>
-                    </Tooltip>
-                  </CardContent>
-                </Card>
-              ))}
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </TabsContent>
 
-        {/* ── Logs tab ── */}
-        <TabsContent value="logs" className="mt-4">
+        {/* ── Logs tab ───────────────────────────────────────────────── */}
+        <TabsContent value="logs" className="mt-4 space-y-3">
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
+            <Select value={logChannel} onValueChange={handleLogChannel}>
+              <SelectTrigger className="h-8 w-44 text-sm">
+                <SelectValue placeholder="Все каналы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все каналы</SelectItem>
+                {(Object.keys(channelConfig) as NotificationChannel[]).map((ch) => (
+                  <SelectItem key={ch} value={ch}>
+                    <ChannelBadge channel={ch} />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={logStatus} onValueChange={handleLogStatus}>
+              <SelectTrigger className="h-8 w-44 text-sm">
+                <SelectValue placeholder="Все статусы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все статусы</SelectItem>
+                {(Object.keys(statusConfig) as NotificationLogStatus[]).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    <StatusBadge status={s} />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {(logChannel !== "all" || logStatus !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-muted-foreground"
+                onClick={() => { setLogChannel("all"); setLogStatus("all"); setLogsPage(1) }}
+              >
+                <XCircleIcon className="mr-1 size-3.5" />
+                Сбросить
+              </Button>
+            )}
+          </div>
+
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
@@ -322,11 +423,11 @@ export function NotificationsPage() {
                 {logsLoading ? (
                   Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 5 }).map((_, j) => (
-                        <TableCell key={j}>
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                      ))}
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     </TableRow>
                   ))
                 ) : logs?.results.length === 0 ? (
@@ -334,8 +435,12 @@ export function NotificationsPage() {
                     <TableCell colSpan={5} className="p-0">
                       <EmptyState
                         icon={InboxIcon}
-                        title="Уведомлений ещё нет"
-                        description="Отправленные уведомления появятся здесь"
+                        title="Уведомлений нет"
+                        description={
+                          logChannel !== "all" || logStatus !== "all"
+                            ? "Попробуйте изменить фильтры"
+                            : "Отправленные уведомления появятся здесь"
+                        }
                       />
                     </TableCell>
                   </TableRow>
@@ -380,27 +485,42 @@ export function NotificationsPage() {
             </Table>
           </div>
 
+          {/* Pagination */}
           {logs && logs.count > 20 && (
-            <div className="mt-3 flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLogsPage((p) => Math.max(1, p - 1))}
-                disabled={!logs.previous}
-              >
-                Назад
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Страница {logsPage} из {Math.ceil(logs.count / 20)}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Страница {logsPage} из {totalLogPages}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLogsPage((p) => p + 1)}
-                disabled={!logs.next}
-              >
-                Вперёд
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLogsPage((p) => Math.max(1, p - 1))}
+                  disabled={!logs.previous}
+                >
+                  Назад
+                </Button>
+                {totalLogPages <= 7 &&
+                  Array.from({ length: totalLogPages }, (_, i) => i + 1).map((p) => (
+                    <Button
+                      key={p}
+                      variant={p === logsPage ? "default" : "outline"}
+                      size="sm"
+                      className="w-8"
+                      onClick={() => setLogsPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLogsPage((p) => p + 1)}
+                  disabled={!logs.next}
+                >
+                  Вперёд
+                </Button>
+              </div>
             </div>
           )}
         </TabsContent>

@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
-import { Dialog, DialogContent } from "@/shared/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/shared/components/ui/dialog"
 import { Badge } from "@/shared/components/ui/badge"
 
 // ─── nav items ────────────────────────────────────────────────────────────────
@@ -119,6 +119,7 @@ export function CommandPalette() {
           className="overflow-hidden p-0 shadow-2xl"
           aria-describedby={undefined}
         >
+          <DialogTitle className="sr-only">Палитра команд</DialogTitle>
           <Command className="**:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-[11px] **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wider **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-item]]:cursor-pointer **:[[cmdk-item]]:rounded-md **:[[cmdk-item]]:px-3 **:[[cmdk-item]]:py-2.5 **:[[cmdk-item][aria-selected=true]]:bg-accent">
             <div className="flex items-center border-b px-3">
               <SearchIcon className="mr-2 size-4 shrink-0 text-muted-foreground" />

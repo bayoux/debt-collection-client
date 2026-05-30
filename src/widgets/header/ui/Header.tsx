@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation"
 import { Separator } from "@/shared/components/ui/separator"
 import { SidebarTrigger } from "@/shared/components/ui/sidebar"
 import { CommandPalette } from "@/features/command-palette/ui/CommandPalette"
+import { ThemeToggle } from "@/features/theme-toggle/ui/ThemeToggle"
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Дашборд",
@@ -36,7 +37,8 @@ export function Header() {
         />
         <h1 className="text-sm font-medium">{getTitle(pathname)}</h1>
       </div>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-1">
+        <ThemeToggle />
         <CommandPalette />
       </div>
     </header>

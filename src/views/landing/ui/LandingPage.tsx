@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/shared/components/ui/button"
 import { Badge } from "@/shared/components/ui/badge"
+import { ThemeToggle } from "@/features/theme-toggle/ui/ThemeToggle"
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ function Navbar() {
   const [open, setOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -47,6 +48,7 @@ function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
             <Link href="/login">Войти</Link>
           </Button>
@@ -67,7 +69,7 @@ function Navbar() {
       </div>
 
       {open && (
-        <div className="border-t bg-white px-4 py-3 md:hidden">
+        <div className="border-t bg-background px-4 py-3 md:hidden">
           <nav className="flex flex-col gap-3 text-sm">
             <a href="#features" className="text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>
               Возможности
@@ -113,7 +115,7 @@ function AppMockup() {
           { label: "Обещания (PTP)", value: "83",       bg: "bg-amber-100",  fg: "text-amber-600"  },
           { label: "Уведомлений",    value: "342",      bg: "bg-violet-100", fg: "text-violet-600" },
         ].map((s) => (
-          <div key={s.label} className="rounded-lg border bg-white p-2.5 shadow-xs">
+          <div key={s.label} className="rounded-lg border bg-card p-2.5 shadow-xs">
             <div className={`mb-1.5 inline-flex rounded-md p-1 ${s.bg}`}>
               <TrendingUpIcon className={`size-2.5 ${s.fg}`} />
             </div>
@@ -124,7 +126,7 @@ function AppMockup() {
       </div>
 
       {/* Mini chart */}
-      <div className="mx-3 mb-2 rounded-lg border bg-white p-2.5 shadow-xs">
+      <div className="mx-3 mb-2 rounded-lg border bg-card p-2.5 shadow-xs">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11px] font-medium">Активность кампаний</span>
           <span className="text-[10px] text-muted-foreground">7 дней</span>
@@ -495,7 +497,7 @@ function Footer() {
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <Hero />
       <Stats />

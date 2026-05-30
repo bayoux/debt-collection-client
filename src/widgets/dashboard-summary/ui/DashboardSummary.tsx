@@ -95,12 +95,12 @@ export function DashboardSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card
-        className="@container/card animate-fade-up bg-linear-to-t from-blue-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        className="@container/card animate-fade-up bg-linear-to-t from-blue-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:from-blue-950/30"
         style={{ "--delay": "0ms" } as React.CSSProperties}
       >
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <span className="flex items-center justify-center rounded-md bg-blue-100 p-1 text-blue-600">
+            <span className="flex items-center justify-center rounded-md bg-blue-100 p-1 text-blue-600 dark:bg-blue-900 dark:text-blue-400">
               <BriefcaseIcon className="size-3.5" />
             </span>
             Открытые дела
@@ -110,8 +110,8 @@ export function DashboardSummary() {
           </CardTitle>
           <CardAction>
             <Badge className={isOverdueHigh
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-blue-200 bg-blue-50 text-blue-700"
+              ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+              : "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
             }>
               {isOverdueHigh
                 ? <TrendingDownIcon className="size-3" />
@@ -133,12 +133,12 @@ export function DashboardSummary() {
       </Card>
 
       <Card
-        className="@container/card animate-fade-up bg-linear-to-t from-emerald-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        className="@container/card animate-fade-up bg-linear-to-t from-emerald-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:from-emerald-950/30"
         style={{ "--delay": "75ms" } as React.CSSProperties}
       >
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <span className="flex items-center justify-center rounded-md bg-emerald-100 p-1 text-emerald-600">
+            <span className="flex items-center justify-center rounded-md bg-emerald-100 p-1 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400">
               <DollarSignIcon className="size-3.5" />
             </span>
             Общий долг
@@ -151,8 +151,8 @@ export function DashboardSummary() {
           </CardTitle>
           <CardAction>
             <Badge className={isGoodRate
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-amber-200 bg-amber-50 text-amber-700"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
             }>
               {isGoodRate
                 ? <TrendingUpIcon className="size-3" />
@@ -177,12 +177,12 @@ export function DashboardSummary() {
       </Card>
 
       <Card
-        className="@container/card animate-fade-up bg-linear-to-t from-amber-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        className="@container/card animate-fade-up bg-linear-to-t from-amber-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:from-amber-950/30"
         style={{ "--delay": "150ms" } as React.CSSProperties}
       >
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <span className="flex items-center justify-center rounded-md bg-amber-100 p-1 text-amber-600">
+            <span className="flex items-center justify-center rounded-md bg-amber-100 p-1 text-amber-600 dark:bg-amber-900 dark:text-amber-400">
               <HandshakeIcon className="size-3.5" />
             </span>
             Обещания (PTP)
@@ -191,7 +191,7 @@ export function DashboardSummary() {
             {data.ptp_pending.toLocaleString("ru-RU")}
           </CardTitle>
           <CardAction>
-            <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+            <Badge className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
               <TrendingUpIcon className="size-3" />
               {data.ptp_kept_this_month} выполн.
             </Badge>
@@ -209,12 +209,12 @@ export function DashboardSummary() {
       </Card>
 
       <Card
-        className="@container/card animate-fade-up bg-linear-to-t from-violet-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        className="@container/card animate-fade-up bg-linear-to-t from-violet-50/50 to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:from-violet-950/30"
         style={{ "--delay": "225ms" } as React.CSSProperties}
       >
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <span className="flex items-center justify-center rounded-md bg-violet-100 p-1 text-violet-600">
+            <span className="flex items-center justify-center rounded-md bg-violet-100 p-1 text-violet-600 dark:bg-violet-900 dark:text-violet-400">
               <BellIcon className="size-3.5" />
             </span>
             Уведомлений сегодня
@@ -223,7 +223,7 @@ export function DashboardSummary() {
             {data.notifications_sent_today.toLocaleString("ru-RU")}
           </CardTitle>
           <CardAction>
-            <Badge className="border-violet-200 bg-violet-50 text-violet-700">
+            <Badge className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300">
               <TrendingUpIcon className="size-3" />
               Активно
             </Badge>
