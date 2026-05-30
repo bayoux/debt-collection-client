@@ -1,14 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, SearchIcon, XIcon, ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
+import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
 import type { DebtCaseStatus } from "@/entities/debt-case/model/types"
 import { CreateDebtCaseForm } from "@/features/debt-cases/create/ui/CreateDebtCaseForm"
 import { Button } from "@/shared/components/ui/button"
+import { Input } from "@/shared/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -36,23 +38,12 @@ import { Skeleton } from "@/shared/components/ui/skeleton"
 import { QueryError } from "@/shared/components/ui/query-error"
 import { StatusCell } from "./StatusCell"
 
-// ─── config ───────────────────────────────────────────────────────────────────
+// ─── types ────────────────────────────────────────────────────────────────────
 
-const statusLabels: Record<DebtCaseStatus, string> = {
-  new: "Новое",
-  in_progress: "В работе",
-  promised: "Обещано",
-  closed: "Закрыто",
-  overdue: "Просрочено",
-}
+type SortKey = "amount" | "dpd" | "due_date"
+type SortDir = "asc" | "desc"
 
-export const statusStyles: Record<DebtCaseStatus, string> = {
-  new:         "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400",
-  in_progress: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  promised:    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  closed:      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  overdue:     "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
-}
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function getDpdStyle(dpd: number): string {
   if (dpd > 60) return "text-destructive font-bold"
@@ -91,6 +82,13 @@ function DueDateCell({ dateStr }: { dateStr: string }) {
   )
 }
 
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey | null; sortDir: SortDir }) {
+  if (sortKey !== col) return <ArrowUpDownIcon className="ml-1 inline size-3.5 text-muted-foreground/40" />
+  return sortDir === "asc"
+    ? <ArrowUpIcon className="ml-1 inline size-3.5 text-foreground" />
+    : <ArrowDownIcon className="ml-1 inline size-3.5 text-foreground" />
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export function DebtCasesPage() {
@@ -98,9 +96,14 @@ export function DebtCasesPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [createOpen, setCreateOpen] = useState(false)
+  const [inputValue, setInputValue] = useState(() => searchParams.get("search") ?? "")
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>("asc")
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const page   = Math.max(1, Number(searchParams.get("page") ?? "1"))
   const status = (searchParams.get("status") as DebtCaseStatus | "all") ?? "all"
+  const searchFromUrl = searchParams.get("search") ?? ""
 
   function setParam(key: string, value: string | null) {
     const params = new URLSearchParams(searchParams.toString())
@@ -123,7 +126,40 @@ export function DebtCasesPage() {
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  const queryKey = ["debt-cases", page, status]
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setInputValue(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (value) {
+        params.set("search", value)
+      } else {
+        params.delete("search")
+      }
+      params.delete("page")
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    }, 400)
+  }
+
+  function clearSearch() {
+    setInputValue("")
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("search")
+    params.delete("page")
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(key)
+      setSortDir("asc")
+    }
+  }
+
+  const queryKey = ["debt-cases", page, status, searchFromUrl]
 
   const { data, isLoading, error } = useQuery({
     queryKey,
@@ -132,10 +168,22 @@ export function DebtCasesPage() {
         page,
         page_size: 20,
         status: status === "all" ? undefined : status,
+        search: searchFromUrl || undefined,
       }),
   })
 
   const totalPages = data ? Math.ceil(data.count / 20) : 1
+
+  const sortedResults = data?.results
+    ? [...data.results].sort((a, b) => {
+        if (!sortKey) return 0
+        let av: number, bv: number
+        if (sortKey === "amount") { av = a.amount; bv = b.amount }
+        else if (sortKey === "dpd") { av = a.dpd; bv = b.dpd }
+        else { av = new Date(a.due_date).getTime(); bv = new Date(b.due_date).getTime() }
+        return sortDir === "asc" ? av - bv : bv - av
+      })
+    : data?.results
 
   return (
     <div className="space-y-4">
@@ -164,11 +212,26 @@ export function DebtCasesPage() {
         </Dialog>
       </div>
 
-      <div className="flex gap-2">
-        <Select
-          value={status}
-          onValueChange={(v) => setParam("status", v)}
-        >
+      <div className="flex flex-wrap gap-2">
+        <div className="relative max-w-sm flex-1 sm:flex-none sm:w-64">
+          <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Поиск по должнику..."
+            className="pl-8 pr-8"
+            value={inputValue}
+            onChange={handleSearchChange}
+          />
+          {inputValue && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-2.5 top-2.5 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Очистить поиск"
+            >
+              <XIcon className="size-4" />
+            </button>
+          )}
+        </div>
+        <Select value={status} onValueChange={(v) => setParam("status", v)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Все статусы" />
           </SelectTrigger>
@@ -190,9 +253,33 @@ export function DebtCasesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Должник</TableHead>
-              <TableHead>Сумма</TableHead>
-              <TableHead>DPD</TableHead>
-              <TableHead>Дата погашения</TableHead>
+              <TableHead>
+                <button
+                  className="flex items-center font-medium hover:text-foreground"
+                  onClick={() => toggleSort("amount")}
+                >
+                  Сумма
+                  <SortIcon col="amount" sortKey={sortKey} sortDir={sortDir} />
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  className="flex items-center font-medium hover:text-foreground"
+                  onClick={() => toggleSort("dpd")}
+                >
+                  DPD
+                  <SortIcon col="dpd" sortKey={sortKey} sortDir={sortDir} />
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  className="flex items-center font-medium hover:text-foreground"
+                  onClick={() => toggleSort("due_date")}
+                >
+                  Дата погашения
+                  <SortIcon col="due_date" sortKey={sortKey} sortDir={sortDir} />
+                </button>
+              </TableHead>
               <TableHead>Агент</TableHead>
               <TableHead>Статус</TableHead>
             </TableRow>
@@ -208,14 +295,14 @@ export function DebtCasesPage() {
                   ))}
                 </TableRow>
               ))
-            ) : data?.results.length === 0 ? (
+            ) : sortedResults?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                  Дела не найдены
+                  {searchFromUrl ? `Ничего не найдено по «${searchFromUrl}»` : "Дела не найдены"}
                 </TableCell>
               </TableRow>
             ) : (
-              data?.results.map((c) => (
+              sortedResults?.map((c) => (
                 <TableRow
                   key={c.id}
                   className="cursor-pointer transition-colors duration-150 hover:bg-primary/5"
@@ -253,26 +340,40 @@ export function DebtCasesPage() {
       </div>
 
       {data && data.count > 20 && (
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(Math.max(1, page - 1))}
-            disabled={!data.previous}
-          >
-            Назад
-          </Button>
-          <span className="text-sm text-muted-foreground">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
             Страница {page} из {totalPages}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(page + 1)}
-            disabled={!data.next}
-          >
-            Вперёд
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={!data.previous}
+            >
+              Назад
+            </Button>
+            {totalPages <= 7 &&
+              Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  className="w-8"
+                  onClick={() => setPage(p)}
+                >
+                  {p}
+                </Button>
+              ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(page + 1)}
+              disabled={!data.next}
+            >
+              Вперёд
+            </Button>
+          </div>
         </div>
       )}
     </div>

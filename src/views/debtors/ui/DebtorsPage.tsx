@@ -13,13 +13,19 @@ import {
   MailIcon,
   MessageCircleIcon,
   SendIcon,
+  BriefcaseIcon,
+  ChevronRightIcon,
 } from "lucide-react"
+import Link from "next/link"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
 import type { Debtor } from "@/entities/debtor/model/types"
+import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
+import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
 import { CreateDebtorForm } from "@/features/debtors/create/ui/CreateDebtorForm"
 import { ImportDebtorsForm } from "@/features/debtors/import/ui/ImportDebtorsForm"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { Badge } from "@/shared/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -27,6 +33,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/shared/components/ui/sheet"
 import {
   Table,
   TableBody,
@@ -49,9 +61,10 @@ function getInitials(name: string) {
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, size = "sm" }: { name: string; size?: "sm" | "lg" }) {
+  const sz = size === "lg" ? "size-12 text-sm" : "size-8 text-xs"
   return (
-    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+    <div className={`flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary ${sz}`}>
       {getInitials(name)}
     </div>
   )
@@ -121,6 +134,122 @@ function EmptyState({ query }: { query: string }) {
   )
 }
 
+// ─── debtor detail sheet ──────────────────────────────────────────────────────
+
+function DebtorSheet({
+  debtor,
+  open,
+  onClose,
+}: {
+  debtor: Debtor | null
+  open: boolean
+  onClose: () => void
+}) {
+  const { data: cases, isLoading: casesLoading } = useQuery({
+    queryKey: ["debt-cases", "debtor", debtor?.id],
+    queryFn: () => debtCaseApi.list({ debtor_id: debtor!.id, page_size: 20 }),
+    enabled: !!debtor,
+  })
+
+  if (!debtor) return null
+
+  const contactRows = [
+    { icon: PhoneIcon,         label: "Телефон",  value: debtor.phone },
+    { icon: MailIcon,          label: "Email",    value: debtor.email ?? "—" },
+    { icon: MessageCircleIcon, label: "WhatsApp", value: debtor.whatsapp_number ?? "—" },
+    { icon: SendIcon,          label: "Telegram", value: debtor.telegram_id ?? "—" },
+  ]
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="flex flex-col gap-0 overflow-y-auto p-0 sm:max-w-md">
+        <SheetHeader className="border-b p-5 pr-12">
+          <div className="flex items-center gap-3">
+            <Avatar name={debtor.full_name} size="lg" />
+            <div className="min-w-0">
+              <SheetTitle className="truncate">{debtor.full_name}</SheetTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">{debtor.phone}</p>
+            </div>
+          </div>
+        </SheetHeader>
+
+        {/* Contact info */}
+        <div className="border-b p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Контакты
+          </p>
+          <div className="space-y-0 divide-y">
+            {contactRows.map(({ icon: Icon, label, value }) => (
+              <div key={label} className="flex items-center gap-3 py-2 text-sm">
+                <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+                <span className="truncate font-medium">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Debt cases */}
+        <div className="flex-1 p-5">
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <BriefcaseIcon className="size-3.5" />
+            Дела о задолженности
+            {cases && (
+              <span className="ml-1 rounded-full bg-muted px-1.5 py-px text-[10px] font-normal normal-case text-muted-foreground">
+                {cases.count}
+              </span>
+            )}
+          </p>
+
+          {casesLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : !cases || cases.results.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                <BriefcaseIcon className="size-4 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">Дел не найдено</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {cases.results.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/debt-cases/${c.id}`}
+                  onClick={onClose}
+                  className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={`shrink-0 text-[10px] ${statusStyles[c.status]}`}
+                      >
+                        {statusLabels[c.status]}
+                      </Badge>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        DPD: {c.dpd}
+                      </span>
+                    </div>
+                    <div className="mt-1 font-mono tabular-nums font-medium">
+                      {c.amount.toLocaleString("ru-RU")} сом
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="ml-2 size-4 shrink-0 text-muted-foreground" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export function DebtorsPage() {
@@ -129,6 +258,7 @@ export function DebtorsPage() {
   const searchParams = useSearchParams()
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [selectedDebtor, setSelectedDebtor] = useState<Debtor | null>(null)
 
   const page          = Math.max(1, Number(searchParams.get("page") ?? "1"))
   const searchFromUrl = searchParams.get("search") ?? ""
@@ -284,7 +414,8 @@ export function DebtorsPage() {
               data?.results.map((debtor) => (
                 <TableRow
                   key={debtor.id}
-                  className="transition-colors duration-150 hover:bg-primary/5"
+                  className="cursor-pointer transition-colors duration-150 hover:bg-primary/5"
+                  onClick={() => setSelectedDebtor(debtor)}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -304,7 +435,9 @@ export function DebtorsPage() {
                   <TableCell>
                     <ChannelBadges debtor={debtor} />
                   </TableCell>
-                  <TableCell />
+                  <TableCell>
+                    <ChevronRightIcon className="size-4 text-muted-foreground/40" />
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -350,6 +483,13 @@ export function DebtorsPage() {
           </div>
         </div>
       )}
+
+      {/* ── Debtor detail sheet ─────────────────────────────────────────── */}
+      <DebtorSheet
+        debtor={selectedDebtor}
+        open={!!selectedDebtor}
+        onClose={() => setSelectedDebtor(null)}
+      />
     </div>
   )
 }

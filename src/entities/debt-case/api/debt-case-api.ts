@@ -16,6 +16,9 @@ export const debtCaseApi = {
     dpd_min?: number
     dpd_max?: number
     assigned_agent_id?: string
+    search?: string
+    ordering?: string
+    debtor_id?: string
   }) =>
     apiClient.get<Pagination<DebtCase>>("/debt-cases/", { params }),
 

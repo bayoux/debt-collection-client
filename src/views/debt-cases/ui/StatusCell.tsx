@@ -13,15 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/shared/components/ui/popover"
-import { statusStyles } from "./DebtCasesPage"
-
-const statusLabels: Record<DebtCaseStatus, string> = {
-  new:         "Новое",
-  in_progress: "В работе",
-  promised:    "Обещано",
-  closed:      "Закрыто",
-  overdue:     "Просрочено",
-}
+import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
 
 const ALL_STATUSES = Object.keys(statusLabels) as DebtCaseStatus[]
 

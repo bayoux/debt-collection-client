@@ -15,10 +15,22 @@ import {
   MessageCircleIcon,
   UserCheckIcon,
   BarChart3Icon,
+  CheckCircle2Icon,
+  XCircleIcon,
+  CircleCheckIcon,
+  CircleXIcon,
+  ClockIcon,
+  MessageSquareIcon,
+  SendIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
+import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
 import type { DebtCaseStatus, DPDSnapshot } from "@/entities/debt-case/model/types"
+import { ptpApi } from "@/entities/ptp/api/ptp-api"
+import type { PTPRecord, PTPStatus } from "@/entities/ptp/model/types"
+import { notificationApi } from "@/entities/notification/api/notification-api"
+import type { NotificationChannel, NotificationLogStatus } from "@/entities/notification/model/types"
 import { SendNotificationForm } from "@/features/debt-cases/send-notification/ui/SendNotificationForm"
 import { CreatePtpForm } from "@/features/ptp/create/ui/CreatePtpForm"
 import { Button } from "@/shared/components/ui/button"
@@ -38,17 +50,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs"
 import { Skeleton } from "@/shared/components/ui/skeleton"
-import { statusStyles } from "./DebtCasesPage"
 
-// ─── constants ────────────────────────────────────────────────────────────────
+// ─── status configs ───────────────────────────────────────────────────────────
 
-const statusLabels: Record<DebtCaseStatus, string> = {
-  new: "Новое",
-  in_progress: "В работе",
-  promised: "Обещано",
-  closed: "Закрыто",
-  overdue: "Просрочено",
+const ptpStatusConfig: Record<PTPStatus, { label: string; cls: string }> = {
+  pending: { label: "Ожидает",   cls: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300" },
+  kept:    { label: "Выполнено", cls: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
+  broken:  { label: "Нарушено",  cls: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300" },
+}
+
+const notifLogStatusConfig: Record<NotificationLogStatus, { label: string; cls: string }> = {
+  queued:    { label: "В очереди",  cls: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400" },
+  sent:      { label: "Отправлено", cls: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300" },
+  delivered: { label: "Доставлено", cls: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
+  failed:    { label: "Ошибка",     cls: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300" },
+}
+
+const channelIcons: Record<NotificationChannel, React.ElementType> = {
+  sms:      MessageSquareIcon,
+  whatsapp: MessageCircleIcon,
+  telegram: SendIcon,
+  email:    MailIcon,
+}
+
+const channelLabels: Record<NotificationChannel, string> = {
+  sms: "SMS", whatsapp: "WhatsApp", telegram: "Telegram", email: "Email",
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -124,7 +152,6 @@ function DpdChart({ history }: { history: DPDSnapshot[] }) {
           )
         })}
       </div>
-
       <div className="divide-y">
         {history.slice(0, 6).map((snap) => (
           <div key={snap.id} className="flex items-center justify-between py-1.5 text-sm">
@@ -152,6 +179,60 @@ function DpdChart({ history }: { history: DPDSnapshot[] }) {
   )
 }
 
+function PtpRow({
+  ptp,
+  onUpdate,
+}: {
+  ptp: PTPRecord
+  onUpdate: (id: string, status: "kept" | "broken") => void
+}) {
+  const cfg = ptpStatusConfig[ptp.status]
+  const date = new Date(ptp.promise_date + "T00:00:00")
+  const formatted = date.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-mono tabular-nums font-medium">
+            {ptp.promised_amount.toLocaleString("ru-RU")} сом
+          </span>
+          <span className="text-muted-foreground">→</span>
+          <span className="text-muted-foreground">{formatted}</span>
+        </div>
+        <div className="text-xs text-muted-foreground">агент: {ptp.agent.username}</div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className={cfg.cls}>{cfg.label}</Badge>
+        {ptp.status === "pending" && (
+          <div className="flex gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 gap-1 px-2 text-[11px] text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:border-emerald-700 dark:hover:bg-emerald-950"
+              onClick={() => onUpdate(ptp.id, "kept")}
+            >
+              <CircleCheckIcon className="size-3" />
+              Выполнено
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 gap-1 px-2 text-[11px] text-destructive hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:hover:border-red-800 dark:hover:bg-red-950"
+              onClick={() => onUpdate(ptp.id, "broken")}
+            >
+              <CircleXIcon className="size-3" />
+              Нарушено
+            </Button>
+          </div>
+        )}
+        {ptp.status === "kept" && <CheckCircle2Icon className="size-4 text-emerald-500" />}
+        {ptp.status === "broken" && <XCircleIcon className="size-4 text-destructive" />}
+      </div>
+    </div>
+  )
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -171,11 +252,7 @@ export function DebtCaseDetailPage({ id }: Props) {
   const { mutate: updateStatus } = useMutation({
     mutationFn: (status: DebtCaseStatus) => debtCaseApi.update(id, { status }),
     onSuccess: (c) => {
-      const labels: Record<DebtCaseStatus, string> = {
-        new: "Новое", in_progress: "В работе", promised: "Обещано",
-        closed: "Закрыто", overdue: "Просрочено",
-      }
-      toast.success(`Статус изменён: ${labels[c.status]}`)
+      toast.success(`Статус изменён: ${statusLabels[c.status]}`)
       qc.invalidateQueries({ queryKey: ["debt-cases", id] })
     },
     onError: () => toast.error("Не удалось изменить статус"),
@@ -185,6 +262,28 @@ export function DebtCaseDetailPage({ id }: Props) {
     queryKey: ["debt-cases", id, "dpd-history"],
     queryFn: () => debtCaseApi.dpdHistory(id),
     enabled: !!data,
+  })
+
+  const { data: ptpData } = useQuery({
+    queryKey: ["ptp", "case", id],
+    queryFn: () => ptpApi.list({ debt_case_id: id, page_size: 50 }),
+    enabled: !!data,
+  })
+
+  const { data: notifLogs } = useQuery({
+    queryKey: ["notif-logs", "case", id],
+    queryFn: () => notificationApi.logs.list({ debt_case_id: id, page_size: 50 }),
+    enabled: !!data,
+  })
+
+  const { mutate: updatePtpStatus } = useMutation({
+    mutationFn: ({ ptpId, status }: { ptpId: string; status: "kept" | "broken" }) =>
+      ptpApi.updateStatus(ptpId, status),
+    onSuccess: (_, { status }) => {
+      toast.success(status === "kept" ? "PTP выполнено" : "PTP нарушено")
+      qc.invalidateQueries({ queryKey: ["ptp", "case", id] })
+    },
+    onError: () => toast.error("Не удалось обновить статус PTP"),
   })
 
   if (isLoading) {
@@ -230,11 +329,11 @@ export function DebtCaseDetailPage({ id }: Props) {
   })
 
   const contactRows = [
-    { icon: UserCheckIcon, label: "ФИО",      value: data.debtor.full_name },
-    { icon: PhoneIcon,     label: "Телефон",  value: data.debtor.phone },
-    { icon: MailIcon,      label: "Email",    value: data.debtor.email ?? "—" },
-    { icon: MessageCircleIcon, label: "WhatsApp", value: data.debtor.whatsapp_number ?? "—" },
-    { icon: MessageCircleIcon, label: "Telegram", value: data.debtor.telegram_id ?? "—" },
+    { icon: UserCheckIcon,    label: "ФИО",      value: data.debtor.full_name },
+    { icon: PhoneIcon,        label: "Телефон",  value: data.debtor.phone },
+    { icon: MailIcon,         label: "Email",    value: data.debtor.email ?? "—" },
+    { icon: MessageCircleIcon,label: "WhatsApp", value: data.debtor.whatsapp_number ?? "—" },
+    { icon: MessageCircleIcon,label: "Telegram", value: data.debtor.telegram_id ?? "—" },
   ]
 
   return (
@@ -420,51 +519,177 @@ export function DebtCaseDetailPage({ id }: Props) {
 
       </div>
 
-      {/* ── Info section ───────────────────────────────────────────────── */}
-      <div className="grid gap-4 md:grid-cols-2">
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <span className="flex items-center justify-center rounded-md bg-muted p-1">
-                <UserCheckIcon className="size-3.5 text-muted-foreground" />
+      {/* ── Tabs: info / PTP / notifications ───────────────────────────── */}
+      <Tabs defaultValue="info">
+        <TabsList>
+          <TabsTrigger value="info">Должник</TabsTrigger>
+          <TabsTrigger value="dpd">
+            История DPD
+          </TabsTrigger>
+          <TabsTrigger value="ptp">
+            PTP
+            {ptpData && ptpData.count > 0 && (
+              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary">
+                {ptpData.count}
               </span>
-              Должник
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-0 divide-y">
-            {contactRows.map(({ icon: Icon, label, value }) => (
-              <div
-                key={label}
-                className="flex items-center gap-3 py-2 text-sm"
-              >
-                <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
-                <span className="truncate font-medium">{value}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <span className="flex items-center justify-center rounded-md bg-muted p-1">
-                <BarChart3Icon className="size-3.5 text-muted-foreground" />
-              </span>
-              История DPD
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!dpdHistory ? (
-              <Skeleton className="h-24 w-full" />
-            ) : (
-              <DpdChart history={dpdHistory} />
             )}
-          </CardContent>
-        </Card>
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            Уведомления
+            {notifLogs && notifLogs.count > 0 && (
+              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary">
+                {notifLogs.count}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      </div>
+        {/* ── Debtor info tab ──────────────────────────────────────────── */}
+        <TabsContent value="info" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex items-center justify-center rounded-md bg-muted p-1">
+                  <UserCheckIcon className="size-3.5 text-muted-foreground" />
+                </span>
+                Должник
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-0 divide-y">
+              {contactRows.map(({ icon: Icon, label, value }) => (
+                <div key={label} className="flex items-center gap-3 py-2 text-sm">
+                  <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+                  <span className="truncate font-medium">{value}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── DPD history tab ──────────────────────────────────────────── */}
+        <TabsContent value="dpd" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex items-center justify-center rounded-md bg-muted p-1">
+                  <BarChart3Icon className="size-3.5 text-muted-foreground" />
+                </span>
+                История DPD
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!dpdHistory ? (
+                <Skeleton className="h-24 w-full" />
+              ) : (
+                <DpdChart history={dpdHistory} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── PTP history tab ──────────────────────────────────────────── */}
+        <TabsContent value="ptp" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex items-center justify-center rounded-md bg-muted p-1">
+                  <HandshakeIcon className="size-3.5 text-muted-foreground" />
+                </span>
+                Обещания об оплате
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!ptpData ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : ptpData.results.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10 text-center">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                    <HandshakeIcon className="size-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Обещаний ещё нет</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {ptpData.results.map((ptp) => (
+                    <PtpRow
+                      key={ptp.id}
+                      ptp={ptp}
+                      onUpdate={(ptpId, status) => updatePtpStatus({ ptpId, status })}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Notification log tab ─────────────────────────────────────── */}
+        <TabsContent value="notifications" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex items-center justify-center rounded-md bg-muted p-1">
+                  <BellIcon className="size-3.5 text-muted-foreground" />
+                </span>
+                История уведомлений
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!notifLogs ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : notifLogs.results.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10 text-center">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                    <BellIcon className="size-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Уведомлений ещё не было</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {notifLogs.results.map((log) => {
+                    const Icon = channelIcons[log.channel]
+                    const cfg = notifLogStatusConfig[log.status]
+                    const sentAt = log.sent_at
+                      ? new Date(log.sent_at).toLocaleString("ru-RU", {
+                          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                        })
+                      : null
+                    return (
+                      <div key={log.id} className="flex items-center justify-between gap-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                            <Icon className="size-3.5 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{log.template.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {channelLabels[log.channel]}
+                              {sentAt && <> · {sentAt}</>}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={`shrink-0 text-[11px] ${cfg.cls}`}>
+                          {cfg.label}
+                        </Badge>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
     </div>
   )
 }

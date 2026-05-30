@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
+import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
 import { Dialog, DialogContent, DialogTitle } from "@/shared/components/ui/dialog"
 import { Badge } from "@/shared/components/ui/badge"
 
@@ -37,20 +38,6 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/integrations",  label: "Интеграции",           icon: SettingsIcon        },
 ]
 
-// ─── status labels ────────────────────────────────────────────────────────────
-
-const statusLabels: Record<string, string> = {
-  new: "Новое", in_progress: "В работе", promised: "Обещано",
-  closed: "Закрыто", overdue: "Просрочено",
-}
-const statusStyles: Record<string, string> = {
-  new:         "border-slate-200 bg-slate-50 text-slate-600",
-  in_progress: "border-blue-200 bg-blue-50 text-blue-700",
-  promised:    "border-amber-200 bg-amber-50 text-amber-700",
-  closed:      "border-emerald-200 bg-emerald-50 text-emerald-700",
-  overdue:     "border-red-200 bg-red-50 text-red-700",
-}
-
 // ─── component ────────────────────────────────────────────────────────────────
 
 export function CommandPalette() {
@@ -58,7 +45,6 @@ export function CommandPalette() {
   const [query, setQuery] = useState("")
   const router = useRouter()
 
-  // Cmd+K / Ctrl+K
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -84,8 +70,11 @@ export function CommandPalette() {
 
   const { data: cases } = useQuery({
     queryKey: ["cmd-cases", query],
-    queryFn: () => debtCaseApi.list({ page_size: 5 }),
-    enabled: query.length === 0,
+    queryFn: () =>
+      query.length >= 2
+        ? debtCaseApi.list({ search: query, page_size: 5 })
+        : debtCaseApi.list({ page_size: 5 }),
+    enabled: query.length === 0 || query.length >= 2,
     staleTime: 30_000,
   })
 
@@ -102,7 +91,6 @@ export function CommandPalette() {
 
   return (
     <>
-      {/* Trigger hint — shown in header */}
       <button
         onClick={() => setOpen(true)}
         className="hidden items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted md:flex"
@@ -163,7 +151,7 @@ export function CommandPalette() {
                     <Command.Item
                       key={d.id}
                       value={`debtor-${d.id}`}
-                      onSelect={() => go(`/debtors`)}
+                      onSelect={() => go(`/debtors?search=${encodeURIComponent(d.full_name)}`)}
                       className="flex items-center gap-3"
                     >
                       <div className="flex size-7 items-center justify-center rounded-full bg-muted">
@@ -173,6 +161,38 @@ export function CommandPalette() {
                         <div className="truncate text-sm font-medium">{d.full_name}</div>
                         <div className="text-xs text-muted-foreground">{d.phone}</div>
                       </div>
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+              )}
+
+              {/* Debt case search results (when typing) */}
+              {query.length >= 2 && cases && cases.results.length > 0 && (
+                <Command.Group heading="Дела">
+                  {cases.results.map((c) => (
+                    <Command.Item
+                      key={c.id}
+                      value={`case-${c.id}`}
+                      onSelect={() => go(`/debt-cases/${c.id}`)}
+                      className="flex items-center gap-3"
+                    >
+                      <div className="flex size-7 items-center justify-center rounded-md bg-muted">
+                        <BriefcaseIcon className="size-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate text-sm font-medium">
+                          {c.debtor.full_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground tabular-nums">
+                          {c.amount.toLocaleString("ru-RU")} сом
+                        </div>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`shrink-0 text-[10px] ${statusStyles[c.status]}`}
+                      >
+                        {statusLabels[c.status]}
+                      </Badge>
                     </Command.Item>
                   ))}
                 </Command.Group>
@@ -201,7 +221,7 @@ export function CommandPalette() {
                       </div>
                       <Badge
                         variant="outline"
-                        className={`text-[10px] ${statusStyles[c.status]}`}
+                        className={`shrink-0 text-[10px] ${statusStyles[c.status]}`}
                       >
                         {statusLabels[c.status]}
                       </Badge>

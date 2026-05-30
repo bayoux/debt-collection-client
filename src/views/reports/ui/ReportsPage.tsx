@@ -10,6 +10,7 @@ import {
   MessageCircleIcon,
   MessageSquareIcon,
   SendIcon,
+  DownloadIcon,
   type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
@@ -89,6 +90,19 @@ function humanizeAction(action: string) {
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ")
+}
+
+function downloadCsv(filename: string, rows: string[][]) {
+  const csv = rows
+    .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+    .join("\n")
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -220,6 +234,7 @@ export function ReportsPage() {
         <TabsContent value="campaign" className="mt-4 space-y-4">
 
           {/* Filters */}
+
           <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
             {/* Presets */}
             <div className="flex flex-wrap gap-1.5">
@@ -274,6 +289,35 @@ export function ReportsPage() {
                 Применить
               </Button>
             </div>
+          </div>
+
+          {/* Table header with export */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {campaign ? `${campaign.length} строк` : ""}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!campaign?.length}
+              onClick={() => {
+                if (!campaign) return
+                downloadCsv(`campaign-${query.dateFrom}-${query.dateTo}.csv`, [
+                  ["Дата", "Канал", "Отправлено", "Доставлено", "PTP", "Собрано (сом)"],
+                  ...campaign.map((r) => [
+                    r.report_date,
+                    channelConfig[r.channel]?.label ?? r.channel,
+                    String(r.total_sent),
+                    String(r.total_delivered),
+                    String(r.total_ptp),
+                    String(r.collected_amount),
+                  ]),
+                ])
+              }}
+            >
+              <DownloadIcon className="mr-1.5 size-3.5" />
+              Экспорт CSV
+            </Button>
           </div>
 
           {/* Table */}
@@ -362,6 +406,30 @@ export function ReportsPage() {
 
         {/* ── Activity tab ───────────────────────────────────────────── */}
         <TabsContent value="activity" className="mt-4 space-y-3">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!activity?.results.length}
+              onClick={() => {
+                if (!activity) return
+                downloadCsv("agent-activity.csv", [
+                  ["Агент", "Действие", "Дело", "Время", "Примечание"],
+                  ...activity.results.map((log) => [
+                    log.agent.username,
+                    log.action_type,
+                    log.debt_case_id ?? "",
+                    log.performed_at,
+                    log.note ?? "",
+                  ]),
+                ])
+              }}
+            >
+              <DownloadIcon className="mr-1.5 size-3.5" />
+              Экспорт CSV
+            </Button>
+          </div>
+
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
