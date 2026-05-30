@@ -130,18 +130,27 @@ export function CampaignBarChart() {
           </ChartContainer>
         )}
       </CardContent>
-      {!isLoading && totalSent > 0 && (
-        <CardFooter className="flex-col items-start gap-1 text-sm">
-          <div className="flex items-center gap-1.5 font-medium">
-            Доставляемость {deliveryRate}%
-            <TrendingUpIcon className="size-4 text-primary" />
-          </div>
-          <div className="text-muted-foreground">
-            {totalDelivered.toLocaleString("ru-RU")} из{" "}
-            {totalSent.toLocaleString("ru-RU")} доставлено за период
-          </div>
-        </CardFooter>
-      )}
+      <CardFooter className="flex-col items-start gap-1 text-sm">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-52 mt-0.5" />
+          </>
+        ) : totalSent > 0 ? (
+          <>
+            <div className="flex items-center gap-1.5 font-medium">
+              Доставляемость {deliveryRate}%
+              <TrendingUpIcon className="size-4 text-primary" />
+            </div>
+            <div className="text-muted-foreground">
+              {totalDelivered.toLocaleString("ru-RU")} из{" "}
+              {totalSent.toLocaleString("ru-RU")} доставлено за период
+            </div>
+          </>
+        ) : (
+          <span className="text-muted-foreground">Нет данных за период</span>
+        )}
+      </CardFooter>
     </Card>
   )
 }

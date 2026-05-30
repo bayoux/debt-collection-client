@@ -53,7 +53,7 @@ export function CasesDonutChart() {
         <CardTitle>Структура дел</CardTitle>
         <CardDescription>Просроченные vs в работе</CardDescription>
       </CardHeader>
-      <CardContent className="pb-0">
+      <CardContent>
         {isLoading ? (
           <Skeleton className="mx-auto h-48 w-48 rounded-full" />
         ) : (
@@ -110,7 +110,7 @@ export function CasesDonutChart() {
         )}
       </CardContent>
       {data && (
-        <CardFooter className="mt-4 flex justify-around border-t pt-4 text-sm">
+        <CardFooter className="justify-around text-sm">
           <div className="text-center">
             <div className="font-semibold tabular-nums">
               {normal.toLocaleString("ru-RU")}
