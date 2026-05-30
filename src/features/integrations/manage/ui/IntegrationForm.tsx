@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { integrationApi } from "@/entities/integration/api/integration-api"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -40,10 +41,14 @@ export function IntegrationForm({ onSuccess }: Props) {
   const qc = useQueryClient()
   const { mutate, isPending } = useMutation({
     mutationFn: integrationApi.create,
-    onSuccess: () => {
+    onSuccess: (cfg) => {
+      toast.success("Интеграция добавлена", {
+        description: `${cfg.channel.toUpperCase()} · ${cfg.provider}`,
+      })
       qc.invalidateQueries({ queryKey: ["integrations"] })
       onSuccess?.()
     },
+    onError: () => toast.error("Не удалось добавить интеграцию"),
   })
 
   const form = useForm<FormValues>({

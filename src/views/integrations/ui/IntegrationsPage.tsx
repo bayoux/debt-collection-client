@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   PlusIcon,
   Trash2Icon,
@@ -244,9 +245,14 @@ export function IntegrationsPage() {
   const { mutate: deleteIntegration, isPending: isDeleting } = useMutation({
     mutationFn: integrationApi.delete,
     onSuccess: () => {
+      const label = deleteTarget
+        ? `${channelConfig[deleteTarget.channel].label} · ${deleteTarget.provider}`
+        : undefined
+      toast.success("Интеграция удалена", { description: label })
       qc.invalidateQueries({ queryKey: ["integrations"] })
       setDeleteTarget(null)
     },
+    onError: () => toast.error("Не удалось удалить интеграцию"),
   })
 
   const { mutate: testIntegration } = useMutation({
@@ -254,13 +260,15 @@ export function IntegrationsPage() {
     onMutate: (id) => setTestingIds((s) => new Set(s).add(id)),
     onSettled: (_, __, id) =>
       setTestingIds((s) => { const n = new Set(s); n.delete(id); return n }),
-    onSuccess: (res, id) =>
-      setTestResults((prev) => ({ ...prev, [id]: res })),
-    onError: (_, id) =>
-      setTestResults((prev) => ({
-        ...prev,
-        [id]: { success: false, message: "Ошибка соединения" },
-      })),
+    onSuccess: (res, id) => {
+      setTestResults((prev) => ({ ...prev, [id]: res }))
+      if (res.success) toast.success("Соединение успешно", { description: res.message })
+      else toast.error("Тест не прошёл", { description: res.message })
+    },
+    onError: (_, id) => {
+      setTestResults((prev) => ({ ...prev, [id]: { success: false, message: "Ошибка соединения" } }))
+      toast.error("Ошибка соединения")
+    },
   })
 
   return (

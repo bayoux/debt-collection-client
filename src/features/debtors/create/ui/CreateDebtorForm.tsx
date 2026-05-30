@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -34,10 +35,12 @@ export function CreateDebtorForm({ onSuccess }: Props) {
   const qc = useQueryClient()
   const { mutate, isPending } = useMutation({
     mutationFn: debtorApi.create,
-    onSuccess: () => {
+    onSuccess: (debtor) => {
+      toast.success("Должник добавлен", { description: debtor.full_name })
       qc.invalidateQueries({ queryKey: ["debtors"] })
       onSuccess?.()
     },
+    onError: () => toast.error("Не удалось добавить должника"),
   })
 
   const form = useForm<FormValues>({

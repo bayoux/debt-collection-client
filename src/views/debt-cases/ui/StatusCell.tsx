@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { CheckIcon, ChevronDownIcon, LoaderIcon } from "lucide-react"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
 import type { DebtCase, DebtCaseStatus } from "@/entities/debt-case/model/types"
@@ -54,8 +55,13 @@ export function StatusCell({ caseId, status, queryKey }: Props) {
       return { prev }
     },
 
+    onSuccess: (_data, next) => {
+      toast.success(`Статус изменён: ${statusLabels[next]}`)
+    },
+
     onError: (_err, _next, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(queryKey, ctx.prev)
+      toast.error("Не удалось изменить статус")
     },
 
     onSettled: () => {

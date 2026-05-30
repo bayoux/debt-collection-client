@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   PlusIcon,
   CircleXIcon,
@@ -189,7 +190,11 @@ export function SchedulerPage() {
 
   const { mutate: cancelTask } = useMutation({
     mutationFn: notificationApi.scheduler.cancel,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["scheduled-tasks"] }),
+    onSuccess: () => {
+      toast.success("Задача отменена")
+      qc.invalidateQueries({ queryKey: ["scheduled-tasks"] })
+    },
+    onError: () => toast.error("Не удалось отменить задачу"),
   })
 
   const totalPages = data ? Math.ceil(data.count / 20) : 1

@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { userApi } from "@/entities/user/api/user-api"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -32,10 +33,12 @@ export function CreateUserForm({ onSuccess }: Props) {
   const qc = useQueryClient()
   const { mutate, isPending } = useMutation({
     mutationFn: userApi.create,
-    onSuccess: () => {
+    onSuccess: (user) => {
+      toast.success("Пользователь создан", { description: user.username })
       qc.invalidateQueries({ queryKey: ["users"] })
       onSuccess?.()
     },
+    onError: () => toast.error("Не удалось создать пользователя"),
   })
 
   const form = useForm<FormValues>({

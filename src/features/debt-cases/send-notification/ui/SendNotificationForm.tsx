@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { notificationApi } from "@/entities/notification/api/notification-api"
 import { Button } from "@/shared/components/ui/button"
 import {
@@ -21,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select"
-import { Alert, AlertDescription } from "@/shared/components/ui/alert"
 
 const schema = z.object({
   template_id: z.string().min(1, "Выберите шаблон"),
@@ -48,9 +48,18 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
     queryFn: () => notificationApi.templates.list(),
   })
 
-  const { mutate, isPending, isSuccess, error } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: notificationApi.send,
-    onSuccess: () => onSuccess?.(),
+    onSuccess: (_, vars) => {
+      const template = templates?.find((t) => t.id === vars.template_id)
+      toast.success("Уведомление поставлено в очередь", {
+        description: template
+          ? `${template.name} · ${channelLabels[vars.channel]}`
+          : channelLabels[vars.channel],
+      })
+      onSuccess?.()
+    },
+    onError: () => toast.error("Не удалось отправить уведомление"),
   })
 
   const form = useForm<FormValues>({
@@ -117,16 +126,6 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
             </FormItem>
           )}
         />
-        {isSuccess && (
-          <Alert>
-            <AlertDescription>Уведомление поставлено в очередь.</AlertDescription>
-          </Alert>
-        )}
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>Не удалось отправить уведомление.</AlertDescription>
-          </Alert>
-        )}
         <Button type="submit" disabled={isPending} className="w-full">
           {isPending ? "Отправляем..." : "Отправить"}
         </Button>

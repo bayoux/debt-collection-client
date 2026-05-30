@@ -3,9 +3,9 @@
 import { useRef, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { UploadIcon } from "lucide-react"
+import { toast } from "sonner"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
 import { Button } from "@/shared/components/ui/button"
-import { Alert, AlertDescription } from "@/shared/components/ui/alert"
 
 interface Props {
   onSuccess?: (taskId: string) => void
@@ -15,9 +15,13 @@ export function ImportDebtorsForm({ onSuccess }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState<string | null>(null)
 
-  const { mutate, isPending, data, error } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: (file: File) => debtorApi.import(file),
-    onSuccess: (res) => onSuccess?.(res.task_id),
+    onSuccess: (res) => {
+      toast.success("Импорт запущен", { description: res.message })
+      onSuccess?.(res.task_id)
+    },
+    onError: () => toast.error("Ошибка импорта", { description: "Проверьте формат файла (CSV или Excel)" }),
   })
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -51,18 +55,6 @@ export function ImportDebtorsForm({ onSuccess }: Props) {
           onChange={handleFileChange}
         />
       </div>
-
-      {data && (
-        <Alert>
-          <AlertDescription>{data.message}</AlertDescription>
-        </Alert>
-      )}
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>Ошибка импорта. Проверьте формат файла.</AlertDescription>
-        </Alert>
-      )}
 
       <Button
         onClick={handleSubmit}

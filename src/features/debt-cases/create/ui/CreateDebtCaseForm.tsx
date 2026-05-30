@@ -4,6 +4,7 @@ import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
 import { userApi } from "@/entities/user/api/user-api"
@@ -51,10 +52,14 @@ export function CreateDebtCaseForm({ onSuccess }: Props) {
 
   const { mutate, isPending } = useMutation({
     mutationFn: debtCaseApi.create,
-    onSuccess: () => {
+    onSuccess: (c) => {
+      toast.success("Дело создано", {
+        description: `${c.debtor.full_name} — ${c.amount.toLocaleString("ru-RU")} сом`,
+      })
       qc.invalidateQueries({ queryKey: ["debt-cases"] })
       onSuccess?.()
     },
+    onError: () => toast.error("Не удалось создать дело"),
   })
 
   const form = useForm<FormValues>({

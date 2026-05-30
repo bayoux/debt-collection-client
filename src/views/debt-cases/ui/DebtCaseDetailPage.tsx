@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   ArrowLeftIcon,
   BellIcon,
@@ -169,7 +170,15 @@ export function DebtCaseDetailPage({ id }: Props) {
 
   const { mutate: updateStatus } = useMutation({
     mutationFn: (status: DebtCaseStatus) => debtCaseApi.update(id, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["debt-cases", id] }),
+    onSuccess: (c) => {
+      const labels: Record<DebtCaseStatus, string> = {
+        new: "Новое", in_progress: "В работе", promised: "Обещано",
+        closed: "Закрыто", overdue: "Просрочено",
+      }
+      toast.success(`Статус изменён: ${labels[c.status]}`)
+      qc.invalidateQueries({ queryKey: ["debt-cases", id] })
+    },
+    onError: () => toast.error("Не удалось изменить статус"),
   })
 
   const { data: dpdHistory } = useQuery({

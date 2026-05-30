@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   PlusIcon,
   Trash2Icon,
@@ -105,9 +106,11 @@ export function UsersPage() {
   const { mutate: deleteUser, isPending: isDeleting } = useMutation({
     mutationFn: userApi.delete,
     onSuccess: () => {
+      toast.success("Пользователь удалён", { description: deleteTarget?.username })
       qc.invalidateQueries({ queryKey: ["users"] })
       setDeleteTarget(null)
     },
+    onError: () => toast.error("Не удалось удалить пользователя"),
   })
 
   const filtered = useMemo(() => {

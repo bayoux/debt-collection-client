@@ -4,6 +4,7 @@ import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { ptpApi } from "@/entities/ptp/api/ptp-api"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -32,10 +33,17 @@ export function CreatePtpForm({ debtCaseId, onSuccess }: Props) {
   const qc = useQueryClient()
   const { mutate, isPending } = useMutation({
     mutationFn: ptpApi.create,
-    onSuccess: () => {
+    onSuccess: (ptp) => {
+      const date = new Date(ptp.promise_date).toLocaleDateString("ru-RU", {
+        day: "numeric", month: "long",
+      })
+      toast.success("PTP зафиксировано", {
+        description: `${ptp.promised_amount.toLocaleString("ru-RU")} сом · ${date}`,
+      })
       qc.invalidateQueries({ queryKey: ["ptp"] })
       onSuccess?.()
     },
+    onError: () => toast.error("Не удалось зафиксировать PTP"),
   })
 
   const form = useForm<FormValues>({

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   CircleCheckIcon,
   CircleXIcon,
@@ -218,7 +219,11 @@ export function PtpPage() {
   const { mutate: updateStatus } = useMutation({
     mutationFn: ({ id, status }: { id: string; status: "kept" | "broken" }) =>
       ptpApi.updateStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ptp"] }),
+    onSuccess: (_, { status }) => {
+      toast.success(status === "kept" ? "PTP выполнено" : "PTP нарушено")
+      qc.invalidateQueries({ queryKey: ["ptp"] })
+    },
+    onError: () => toast.error("Не удалось обновить статус PTP"),
   })
 
   const totalPages = data ? Math.ceil(data.count / 20) : 1

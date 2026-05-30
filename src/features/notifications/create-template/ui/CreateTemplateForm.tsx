@@ -4,6 +4,7 @@ import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { notificationApi } from "@/entities/notification/api/notification-api"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -42,10 +43,12 @@ export function CreateTemplateForm({ onSuccess }: Props) {
   const qc = useQueryClient()
   const { mutate, isPending } = useMutation({
     mutationFn: notificationApi.templates.create,
-    onSuccess: () => {
+    onSuccess: (t) => {
+      toast.success("Шаблон создан", { description: t.name })
       qc.invalidateQueries({ queryKey: ["notification-templates"] })
       onSuccess?.()
     },
+    onError: () => toast.error("Не удалось создать шаблон"),
   })
 
   const form = useForm<FormValues>({
