@@ -59,6 +59,7 @@ export function IntegrationForm({ onSuccess }: Props) {
 
   const channel = form.watch("channel")
   const isEmail = channel === "email"
+  const isTelegram = channel === "telegram"
 
   function onSubmit(values: FormValues) {
     mutate({
@@ -82,9 +83,12 @@ export function IntegrationForm({ onSuccess }: Props) {
               <Select
                 onValueChange={(v) => {
                   field.onChange(v)
+                  const prev = form.getValues("provider")
                   if (v === "email") {
                     form.setValue("provider", "smtp.gmail.com")
-                  } else if (form.getValues("provider") === "smtp.gmail.com") {
+                  } else if (v === "telegram") {
+                    form.setValue("provider", "telegram")
+                  } else if (prev === "smtp.gmail.com" || prev === "telegram") {
                     form.setValue("provider", "")
                   }
                 }}
@@ -98,7 +102,7 @@ export function IntegrationForm({ onSuccess }: Props) {
                 <SelectContent>
                   <SelectItem value="sms">SMS</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="telegram">Telegram</SelectItem>
+                  <SelectItem value="telegram">Telegram (Bot)</SelectItem>
                   <SelectItem value="email">Email (Gmail SMTP)</SelectItem>
                 </SelectContent>
               </Select>
@@ -114,13 +118,18 @@ export function IntegrationForm({ onSuccess }: Props) {
               <FormLabel>Провайдер *</FormLabel>
               <FormControl>
                 <Input
-                  placeholder={isEmail ? "smtp.gmail.com" : "ch2d"}
+                  placeholder={isEmail ? "smtp.gmail.com" : isTelegram ? "telegram" : "ch2d"}
                   {...field}
                 />
               </FormControl>
               {isEmail && (
                 <FormDescription>
                   Для Gmail используйте <code>smtp.gmail.com</code>
+                </FormDescription>
+              )}
+              {isTelegram && (
+                <FormDescription>
+                  Используйте <code>telegram</code> как идентификатор провайдера
                 </FormDescription>
               )}
               <FormMessage />
@@ -132,17 +141,24 @@ export function IntegrationForm({ onSuccess }: Props) {
           name="api_key"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{isEmail ? "Пароль приложения Gmail *" : "API Ключ *"}</FormLabel>
+              <FormLabel>
+                {isEmail ? "Пароль приложения Gmail *" : isTelegram ? "Bot Token *" : "API Ключ *"}
+              </FormLabel>
               <FormControl>
                 <Input
                   type="password"
-                  placeholder={isEmail ? "xxxx xxxx xxxx xxxx" : "sk-..."}
+                  placeholder={isEmail ? "xxxx xxxx xxxx xxxx" : isTelegram ? "123456789:AAF..." : "sk-..."}
                   {...field}
                 />
               </FormControl>
               {isEmail && (
                 <FormDescription>
                   Создайте App Password в Google Account → Security → 2-Step Verification
+                </FormDescription>
+              )}
+              {isTelegram && (
+                <FormDescription>
+                  Получите токен у @BotFather в Telegram: /newbot → скопируйте токен
                 </FormDescription>
               )}
               <FormMessage />

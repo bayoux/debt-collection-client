@@ -11,6 +11,7 @@ import { Input } from "@/shared/components/ui/input"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -145,6 +146,11 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
             </FormItem>
           )}
         />
+        {channel === "telegram" && (
+          <FormDescription className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
+            Сообщение будет отправлено на Telegram ID, указанный в профиле должника
+          </FormDescription>
+        )}
         {channel === "email" && (
           <>
             <FormField
