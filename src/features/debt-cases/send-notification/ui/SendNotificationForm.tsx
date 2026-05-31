@@ -6,6 +6,8 @@ import { z } from "zod"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { notificationApi } from "@/entities/notification/api/notification-api"
+import type { DebtCase } from "@/entities/debt-case/model/types"
+import { statusLabels } from "@/entities/debt-case/model/status"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import {
@@ -24,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select"
+import { resolveTemplate } from "@/shared/lib/utils"
 
 const schema = z
   .object({
@@ -55,10 +58,12 @@ const channelLabels = {
 
 interface Props {
   debtCaseId: string
+  debtCase?: DebtCase
+  extraVars?: Record<string, string>
   onSuccess?: () => void
 }
 
-export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
+export function SendNotificationForm({ debtCaseId, debtCase, extraVars, onSuccess }: Props) {
   const { data: templates } = useQuery({
     queryKey: ["notification-templates"],
     queryFn: () => notificationApi.templates.list(),
@@ -84,6 +89,30 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
   })
 
   const channel = form.watch("channel")
+  const templateId = form.watch("template_id")
+  const selectedTemplate = templates?.find((t) => t.id === templateId)
+
+  const templateVars: Record<string, string> = {
+    ...(debtCase
+      ? {
+          full_name: debtCase.debtor.full_name,
+          phone: debtCase.debtor.phone,
+          email: debtCase.debtor.email ?? "",
+          amount: debtCase.amount.toLocaleString("ru-RU"),
+          due_date: new Date(debtCase.due_date + "T00:00:00").toLocaleDateString("ru-RU", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          }),
+          dpd: String(debtCase.dpd),
+          status: statusLabels[debtCase.status],
+        }
+      : {}),
+    ...extraVars,
+  }
+
+  const resolvedBody = selectedTemplate ? resolveTemplate(selectedTemplate.body, templateVars) : null
+  const hasVars = selectedTemplate ? /\{\{[^}]+\}\}/.test(selectedTemplate.body) : false
 
   function onSubmit(values: FormValues) {
     mutate({
@@ -92,6 +121,7 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
       channel: values.channel,
       recipient_email: values.channel === "email" ? values.recipient_email : undefined,
       subject: values.channel === "email" && values.subject ? values.subject : undefined,
+      variables: undefined,
     })
   }
 
@@ -146,6 +176,21 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
             </FormItem>
           )}
         />
+
+        {resolvedBody && (
+          <div className="rounded-md border bg-muted/40 px-3 py-2.5 space-y-1">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              Предпросмотр сообщения
+            </p>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{resolvedBody}</p>
+            {hasVars && !debtCase && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                Переменные будут подставлены при отправке
+              </p>
+            )}
+          </div>
+        )}
+
         {channel === "telegram" && (
           <FormDescription className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
             Сообщение будет отправлено на Telegram ID, указанный в профиле должника

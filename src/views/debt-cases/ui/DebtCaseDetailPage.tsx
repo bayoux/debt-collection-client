@@ -312,6 +312,18 @@ export function DebtCaseDetailPage({ id }: Props) {
 
   if (!data) return <p className="text-muted-foreground">Дело не найдено.</p>
 
+  const latestPtp = ptpData?.results.find((p) => p.status === "pending") ?? ptpData?.results[0]
+  const ptpExtraVars: Record<string, string> = latestPtp
+    ? {
+        promise_date: new Date(latestPtp.promise_date + "T00:00:00").toLocaleDateString("ru-RU", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }),
+        promised_amount: latestPtp.promised_amount.toLocaleString("ru-RU"),
+      }
+    : {}
+
   const dpd = dpdTheme(data.dpd)
   const dueDate = new Date(data.due_date + "T00:00:00")
   const today = new Date()
@@ -409,6 +421,8 @@ export function DebtCaseDetailPage({ id }: Props) {
               </DialogHeader>
               <SendNotificationForm
                 debtCaseId={id}
+                debtCase={data}
+                extraVars={ptpExtraVars}
                 onSuccess={() => setSendOpen(false)}
               />
             </DialogContent>

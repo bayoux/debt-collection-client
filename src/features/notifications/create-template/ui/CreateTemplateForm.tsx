@@ -132,7 +132,7 @@ export function CreateTemplateForm({ onSuccess }: Props) {
                 />
               </FormControl>
               <FormDescription>
-                Переменные: {`{{full_name}}, {{amount}}, {{due_date}}`}
+                Авто: {`{{full_name}}, {{phone}}, {{email}}, {{amount}}, {{due_date}}, {{dpd}}, {{status}}, {{promise_date}}, {{promised_amount}}`}
               </FormDescription>
               <FormMessage />
             </FormItem>

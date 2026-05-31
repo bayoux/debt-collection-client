@@ -112,6 +112,26 @@ const statusConfig: Record<NotificationLogStatus, StatusConfig> = {
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
+function TemplateBody({ body }: { body: string }) {
+  const parts = body.split(/(\{\{[^}]+\}\})/g)
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^\{\{[^}]+\}\}$/.test(part) ? (
+          <span
+            key={i}
+            className="rounded bg-primary/10 px-0.5 font-mono text-[10px] text-primary"
+          >
+            {part}
+          </span>
+        ) : (
+          part
+        )
+      )}
+    </>
+  )
+}
+
 function ChannelBadge({ channel }: { channel: NotificationChannel }) {
   const { label, icon: Icon, badgeCls } = channelConfig[channel]
   return (
@@ -344,14 +364,14 @@ export function NotificationsPage() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <p className="line-clamp-2 cursor-default text-xs text-muted-foreground">
-                            {t.body}
+                            <TemplateBody body={t.body} />
                           </p>
                         </TooltipTrigger>
                         <TooltipContent
                           side="bottom"
                           className="max-w-xs whitespace-pre-wrap text-xs"
                         >
-                          {t.body}
+                          <TemplateBody body={t.body} />
                         </TooltipContent>
                       </Tooltip>
                     </CardContent>

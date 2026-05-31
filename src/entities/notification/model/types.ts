@@ -9,6 +9,8 @@ export interface NotificationTemplate {
   subject: string | null
   body: string
   language: string
+  created_at: string
+  updated_at: string
 }
 
 export interface NotificationTemplateCreate {
@@ -27,6 +29,7 @@ export interface NotificationLog {
   status: NotificationLogStatus
   sent_at: string | null
   response_raw: string | null
+  created_at: string
 }
 
 export interface ScheduledTask {

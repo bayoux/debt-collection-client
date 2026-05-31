@@ -40,6 +40,7 @@ export const notificationApi = {
     channel: NotificationChannel
     recipient_email?: string
     subject?: string
+    variables?: Record<string, string>
   }) =>
     apiClient.post<{ log_id: string; status: string }>(
       "/notifications/send/",
