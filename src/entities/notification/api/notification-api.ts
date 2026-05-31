@@ -38,6 +38,8 @@ export const notificationApi = {
     debt_case_id: string
     template_id: string
     channel: NotificationChannel
+    recipient_email?: string
+    subject?: string
   }) =>
     apiClient.post<{ log_id: string; status: string }>(
       "/notifications/send/",

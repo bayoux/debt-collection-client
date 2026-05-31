@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { notificationApi } from "@/entities/notification/api/notification-api"
 import { Button } from "@/shared/components/ui/button"
+import { Input } from "@/shared/components/ui/input"
 import {
   Form,
   FormControl,
@@ -23,10 +24,24 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 
-const schema = z.object({
-  template_id: z.string().min(1, "Выберите шаблон"),
-  channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
-})
+const schema = z
+  .object({
+    template_id: z.string().min(1, "Выберите шаблон"),
+    channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
+    recipient_email: z.string().optional(),
+    subject: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.channel === "email") {
+      if (!data.recipient_email || !z.string().email().safeParse(data.recipient_email).success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Введите корректный email получателя",
+          path: ["recipient_email"],
+        })
+      }
+    }
+  })
 
 type FormValues = z.infer<typeof schema>
 
@@ -64,14 +79,18 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { template_id: "", channel: "sms" },
+    defaultValues: { template_id: "", channel: "sms", recipient_email: "", subject: "" },
   })
+
+  const channel = form.watch("channel")
 
   function onSubmit(values: FormValues) {
     mutate({
       debt_case_id: debtCaseId,
       template_id: values.template_id,
       channel: values.channel,
+      recipient_email: values.channel === "email" ? values.recipient_email : undefined,
+      subject: values.channel === "email" && values.subject ? values.subject : undefined,
     })
   }
 
@@ -126,6 +145,36 @@ export function SendNotificationForm({ debtCaseId, onSuccess }: Props) {
             </FormItem>
           )}
         />
+        {channel === "email" && (
+          <>
+            <FormField
+              control={form.control}
+              name="recipient_email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email получателя *</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="debtor@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="subject"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Тема письма</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Из шаблона (если задана)" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        )}
         <Button type="submit" disabled={isPending} className="w-full">
           {isPending ? "Отправляем..." : "Отправить"}
         </Button>

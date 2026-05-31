@@ -6,6 +6,7 @@ export interface NotificationTemplate {
   id: string
   name: string
   channel: NotificationChannel
+  subject: string | null
   body: string
   language: string
 }
@@ -13,6 +14,7 @@ export interface NotificationTemplate {
 export interface NotificationTemplateCreate {
   name: string
   channel: NotificationChannel
+  subject?: string
   body: string
   language?: string
 }

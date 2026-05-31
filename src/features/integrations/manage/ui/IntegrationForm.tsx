@@ -11,6 +11,7 @@ import { Input } from "@/shared/components/ui/input"
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -27,7 +28,7 @@ import {
 const schema = z.object({
   channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
   provider: z.string().min(1, "Введите провайдера"),
-  api_key: z.string().min(1, "Введите API ключ"),
+  api_key: z.string().min(1, "Введите API ключ / пароль приложения"),
   webhook_url: z.string().url("Неверный URL").optional().or(z.literal("")),
 })
 
@@ -56,6 +57,9 @@ export function IntegrationForm({ onSuccess }: Props) {
     defaultValues: { channel: "sms", provider: "", api_key: "", webhook_url: "" },
   })
 
+  const channel = form.watch("channel")
+  const isEmail = channel === "email"
+
   function onSubmit(values: FormValues) {
     mutate({
       channel: values.channel,
@@ -75,7 +79,17 @@ export function IntegrationForm({ onSuccess }: Props) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Канал</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select
+                onValueChange={(v) => {
+                  field.onChange(v)
+                  if (v === "email") {
+                    form.setValue("provider", "smtp.gmail.com")
+                  } else if (form.getValues("provider") === "smtp.gmail.com") {
+                    form.setValue("provider", "")
+                  }
+                }}
+                value={field.value}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue />
@@ -85,7 +99,7 @@ export function IntegrationForm({ onSuccess }: Props) {
                   <SelectItem value="sms">SMS</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
                   <SelectItem value="telegram">Telegram</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="email">Email (Gmail SMTP)</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -99,8 +113,16 @@ export function IntegrationForm({ onSuccess }: Props) {
             <FormItem>
               <FormLabel>Провайдер *</FormLabel>
               <FormControl>
-                <Input placeholder="ch2d" {...field} />
+                <Input
+                  placeholder={isEmail ? "smtp.gmail.com" : "ch2d"}
+                  {...field}
+                />
               </FormControl>
+              {isEmail && (
+                <FormDescription>
+                  Для Gmail используйте <code>smtp.gmail.com</code>
+                </FormDescription>
+              )}
               <FormMessage />
             </FormItem>
           )}
@@ -110,27 +132,38 @@ export function IntegrationForm({ onSuccess }: Props) {
           name="api_key"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>API Ключ *</FormLabel>
+              <FormLabel>{isEmail ? "Пароль приложения Gmail *" : "API Ключ *"}</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="sk-..." {...field} />
+                <Input
+                  type="password"
+                  placeholder={isEmail ? "xxxx xxxx xxxx xxxx" : "sk-..."}
+                  {...field}
+                />
               </FormControl>
+              {isEmail && (
+                <FormDescription>
+                  Создайте App Password в Google Account → Security → 2-Step Verification
+                </FormDescription>
+              )}
               <FormMessage />
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="webhook_url"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Webhook URL</FormLabel>
-              <FormControl>
-                <Input type="url" placeholder="https://example.com/webhook" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {!isEmail && (
+          <FormField
+            control={form.control}
+            name="webhook_url"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Webhook URL</FormLabel>
+                <FormControl>
+                  <Input type="url" placeholder="https://example.com/webhook" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <Button type="submit" disabled={isPending} className="w-full">
           {isPending ? "Сохраняем..." : "Добавить интеграцию"}
         </Button>

@@ -29,6 +29,7 @@ import {
 const schema = z.object({
   name: z.string().min(2, "Минимум 2 символа"),
   channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
+  subject: z.string().optional(),
   body: z.string().min(5, "Введите текст шаблона"),
   language: z.string().default("ru"),
 })
@@ -53,13 +54,17 @@ export function CreateTemplateForm({ onSuccess }: Props) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { name: "", channel: "sms", body: "", language: "ru" },
+    defaultValues: { name: "", channel: "sms", subject: "", body: "", language: "ru" },
   })
+
+  const channel = form.watch("channel")
 
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((v) => mutate(v))}
+        onSubmit={form.handleSubmit((v) =>
+          mutate({ ...v, subject: v.subject || undefined })
+        )}
         className="space-y-4"
       >
         <FormField
@@ -98,6 +103,21 @@ export function CreateTemplateForm({ onSuccess }: Props) {
             </FormItem>
           )}
         />
+        {channel === "email" && (
+          <FormField
+            control={form.control}
+            name="subject"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Тема письма</FormLabel>
+                <FormControl>
+                  <Input placeholder="Уведомление о задолженности" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="body"
