@@ -28,7 +28,7 @@ import {
 
 const schema = z.object({
   name: z.string().min(2, "Минимум 2 символа"),
-  channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
+  channel: z.enum(["chat2desk", "sms", "telegram", "email"]),
   subject: z.string().optional(),
   body: z.string().min(5, "Введите текст шаблона"),
   language: z.string().default("ru"),
@@ -93,8 +93,8 @@ export function CreateTemplateForm({ onSuccess }: Props) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
+                  <SelectItem value="chat2desk">Chat2Desk (WhatsApp)</SelectItem>
                   <SelectItem value="sms">SMS</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
                   <SelectItem value="telegram">Telegram</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
                 </SelectContent>

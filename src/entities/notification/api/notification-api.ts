@@ -10,6 +10,7 @@ import type {
   NotificationLogStatus,
   ScheduledTaskStatus,
 } from "../model/types"
+import type { BroadcastResult } from "@/entities/chat2desk/model/types"
 
 export const notificationApi = {
   templates: {
@@ -46,6 +47,14 @@ export const notificationApi = {
       "/notifications/send/",
       data
     ),
+
+  broadcast: (data: {
+    template_id: string
+    channel: NotificationChannel
+    debt_case_ids?: string[]
+    variables?: Record<string, string>
+  }) =>
+    apiClient.post<BroadcastResult>("/notifications/broadcast/", data),
 
   logs: {
     list: (params?: {

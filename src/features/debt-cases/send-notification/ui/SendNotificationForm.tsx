@@ -31,7 +31,7 @@ import { resolveTemplate } from "@/shared/lib/utils"
 const schema = z
   .object({
     template_id: z.string().min(1, "Выберите шаблон"),
-    channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
+    channel: z.enum(["chat2desk", "sms", "telegram", "email"]),
     recipient_email: z.string().optional(),
     subject: z.string().optional(),
   })
@@ -49,12 +49,20 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>
 
-const channelLabels = {
-  whatsapp: "WhatsApp",
-  sms: "SMS",
-  telegram: "Telegram",
-  email: "Email",
+const channelLabels: Record<string, string> = {
+  chat2desk: "Chat2Desk (WhatsApp)",
+  sms:       "SMS",
+  telegram:  "Telegram",
+  email:     "Email",
+  whatsapp:  "WhatsApp",
 }
+
+const channelOptions = [
+  { value: "chat2desk", label: "Chat2Desk (WhatsApp)" },
+  { value: "sms",       label: "SMS" },
+  { value: "telegram",  label: "Telegram" },
+  { value: "email",     label: "Email" },
+] as const
 
 interface Props {
   debtCaseId: string
@@ -141,7 +149,7 @@ export function SendNotificationForm({ debtCaseId, debtCase, extraVars, onSucces
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {Object.entries(channelLabels).map(([value, label]) => (
+                  {channelOptions.map(({ value, label }) => (
                     <SelectItem key={value} value={value}>
                       {label}
                     </SelectItem>
@@ -194,6 +202,12 @@ export function SendNotificationForm({ debtCaseId, debtCase, extraVars, onSucces
         {channel === "telegram" && (
           <FormDescription className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
             Сообщение будет отправлено на Telegram ID, указанный в профиле должника
+          </FormDescription>
+        )}
+        {channel === "chat2desk" && (
+          <FormDescription className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300">
+            Сообщение будет отправлено через Chat2Desk на WhatsApp-номер должника
+            (или на номер телефона, если WhatsApp-номер не указан)
           </FormDescription>
         )}
         {channel === "email" && (

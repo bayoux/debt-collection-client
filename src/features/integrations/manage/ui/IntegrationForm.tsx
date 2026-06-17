@@ -26,7 +26,7 @@ import {
 } from "@/shared/components/ui/select"
 
 const schema = z.object({
-  channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
+  channel: z.enum(["chat2desk", "sms", "telegram", "email"]),
   provider: z.string().min(1, "Введите провайдера"),
   api_key: z.string().min(1, "Введите API ключ / пароль приложения"),
   webhook_url: z.string().url("Неверный URL").optional().or(z.literal("")),
@@ -60,6 +60,7 @@ export function IntegrationForm({ onSuccess }: Props) {
   const channel = form.watch("channel")
   const isEmail = channel === "email"
   const isTelegram = channel === "telegram"
+  const isChat2Desk = channel === "chat2desk"
 
   function onSubmit(values: FormValues) {
     mutate({
@@ -88,7 +89,13 @@ export function IntegrationForm({ onSuccess }: Props) {
                     form.setValue("provider", "smtp.gmail.com")
                   } else if (v === "telegram") {
                     form.setValue("provider", "telegram")
-                  } else if (prev === "smtp.gmail.com" || prev === "telegram") {
+                  } else if (v === "chat2desk") {
+                    form.setValue("provider", "chat2desk")
+                  } else if (
+                    prev === "smtp.gmail.com" ||
+                    prev === "telegram" ||
+                    prev === "chat2desk"
+                  ) {
                     form.setValue("provider", "")
                   }
                 }}
@@ -100,8 +107,8 @@ export function IntegrationForm({ onSuccess }: Props) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
+                  <SelectItem value="chat2desk">Chat2Desk (WhatsApp)</SelectItem>
                   <SelectItem value="sms">SMS</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
                   <SelectItem value="telegram">Telegram (Bot)</SelectItem>
                   <SelectItem value="email">Email (Gmail SMTP)</SelectItem>
                 </SelectContent>
@@ -118,7 +125,12 @@ export function IntegrationForm({ onSuccess }: Props) {
               <FormLabel>Провайдер *</FormLabel>
               <FormControl>
                 <Input
-                  placeholder={isEmail ? "smtp.gmail.com" : isTelegram ? "telegram" : "ch2d"}
+                  placeholder={
+                    isEmail ? "smtp.gmail.com" :
+                    isTelegram ? "telegram" :
+                    isChat2Desk ? "chat2desk" :
+                    "ch2d"
+                  }
                   {...field}
                 />
               </FormControl>
@@ -132,6 +144,11 @@ export function IntegrationForm({ onSuccess }: Props) {
                   Используйте <code>telegram</code> как идентификатор провайдера
                 </FormDescription>
               )}
+              {isChat2Desk && (
+                <FormDescription>
+                  Используйте <code>chat2desk</code> как идентификатор провайдера
+                </FormDescription>
+              )}
               <FormMessage />
             </FormItem>
           )}
@@ -142,12 +159,20 @@ export function IntegrationForm({ onSuccess }: Props) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>
-                {isEmail ? "Пароль приложения Gmail *" : isTelegram ? "Bot Token *" : "API Ключ *"}
+                {isEmail ? "Пароль приложения Gmail *" :
+                 isTelegram ? "Bot Token *" :
+                 isChat2Desk ? "API Токен Chat2Desk *" :
+                 "API Ключ *"}
               </FormLabel>
               <FormControl>
                 <Input
                   type="password"
-                  placeholder={isEmail ? "xxxx xxxx xxxx xxxx" : isTelegram ? "123456789:AAF..." : "sk-..."}
+                  placeholder={
+                    isEmail ? "xxxx xxxx xxxx xxxx" :
+                    isTelegram ? "123456789:AAF..." :
+                    isChat2Desk ? "xxxxxxxxxxxxxxxxxxxxxxxx" :
+                    "sk-..."
+                  }
                   {...field}
                 />
               </FormControl>
@@ -159,6 +184,11 @@ export function IntegrationForm({ onSuccess }: Props) {
               {isTelegram && (
                 <FormDescription>
                   Получите токен у @BotFather в Telegram: /newbot → скопируйте токен
+                </FormDescription>
+              )}
+              {isChat2Desk && (
+                <FormDescription>
+                  Токен из личного кабинета Chat2Desk: Настройки → API
                 </FormDescription>
               )}
               <FormMessage />

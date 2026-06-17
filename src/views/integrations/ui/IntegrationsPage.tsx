@@ -16,6 +16,7 @@ import {
   XCircleIcon,
   type LucideIcon,
 } from "lucide-react"
+import { Chat2DeskDirectSendForm } from "@/features/notifications/chat2desk-direct/ui/Chat2DeskDirectSendForm"
 import { integrationApi } from "@/entities/integration/api/integration-api"
 import type { IntegrationConfig } from "@/entities/integration/model/types"
 import type { NotificationChannel } from "@/entities/notification/model/types"
@@ -62,6 +63,13 @@ const channelConfig: Record<NotificationChannel, ChannelConfig> = {
     iconCls:  "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400",
     cardCls:  "from-green-50/50 dark:from-green-950/20",
     badgeCls: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300",
+  },
+  chat2desk: {
+    label:    "Chat2Desk",
+    icon:     MessageCircleIcon,
+    iconCls:  "bg-teal-100 text-teal-600 dark:bg-teal-900 dark:text-teal-400",
+    cardCls:  "from-teal-50/50 dark:from-teal-950/20",
+    badgeCls: "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300",
   },
   telegram: {
     label:    "Telegram",
@@ -134,8 +142,10 @@ function IntegrationCard({
   testResult: TestState
   isTesting: boolean
 }) {
+  const [directSendOpen, setDirectSendOpen] = useState(false)
   const ch = channelConfig[integration.channel]
   const Icon = ch.icon
+  const isChat2Desk = integration.channel === "chat2desk"
 
   return (
     <Card className={`bg-linear-to-t ${ch.cardCls} to-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}>
@@ -198,21 +208,45 @@ function IntegrationCard({
         )}
 
         <div className="flex items-center justify-between gap-2 pt-0.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={onTest}
-                disabled={isTesting}
-              >
-                <FlaskConicalIcon className="size-3.5" />
-                {isTesting ? "Тест..." : "Тест"}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">Проверить соединение</TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-1.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={onTest}
+                  disabled={isTesting}
+                >
+                  <FlaskConicalIcon className="size-3.5" />
+                  {isTesting ? "Тест..." : "Тест"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">Проверить соединение</TooltipContent>
+            </Tooltip>
+
+            {isChat2Desk && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => setDirectSendOpen(true)}
+                >
+                  <SendIcon className="size-3.5" />
+                  Отправить
+                </Button>
+                <Dialog open={directSendOpen} onOpenChange={setDirectSendOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Отправить сообщение через Chat2Desk</DialogTitle>
+                    </DialogHeader>
+                    <Chat2DeskDirectSendForm onSuccess={() => setDirectSendOpen(false)} />
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+          </div>
 
           <Button
             variant="ghost"

@@ -69,14 +69,15 @@ const notifLogStatusConfig: Record<NotificationLogStatus, { label: string; cls: 
 }
 
 const channelIcons: Record<NotificationChannel, React.ElementType> = {
-  sms:      MessageSquareIcon,
-  whatsapp: MessageCircleIcon,
-  telegram: SendIcon,
-  email:    MailIcon,
+  sms:       MessageSquareIcon,
+  whatsapp:  MessageCircleIcon,
+  chat2desk: MessageCircleIcon,
+  telegram:  SendIcon,
+  email:     MailIcon,
 }
 
 const channelLabels: Record<NotificationChannel, string> = {
-  sms: "SMS", whatsapp: "WhatsApp", telegram: "Telegram", email: "Email",
+  sms: "SMS", whatsapp: "WhatsApp", chat2desk: "Chat2Desk", telegram: "Telegram", email: "Email",
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────

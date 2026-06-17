@@ -45,11 +45,12 @@ const channelConfig: Record<
   NotificationChannel | "all",
   { label: string; icon?: LucideIcon; badgeCls: string }
 > = {
-  all:      { label: "Все каналы", badgeCls: "" },
-  sms:      { label: "SMS",      icon: MessageSquareIcon, badgeCls: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"       },
-  whatsapp: { label: "WhatsApp", icon: MessageCircleIcon, badgeCls: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300" },
-  telegram: { label: "Telegram", icon: SendIcon,          badgeCls: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300"             },
-  email:    { label: "Email",    icon: MailIcon,          badgeCls: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300" },
+  all:       { label: "Все каналы", badgeCls: "" },
+  sms:       { label: "SMS",        icon: MessageSquareIcon, badgeCls: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"       },
+  whatsapp:  { label: "WhatsApp",   icon: MessageCircleIcon, badgeCls: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300" },
+  chat2desk: { label: "Chat2Desk",  icon: MessageCircleIcon, badgeCls: "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300"       },
+  telegram:  { label: "Telegram",   icon: SendIcon,          badgeCls: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300"             },
+  email:     { label: "Email",      icon: MailIcon,          badgeCls: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300" },
 }
 
 const DATE_PRESETS = [

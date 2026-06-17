@@ -28,7 +28,7 @@ import {
 const schema = z.object({
   debt_case_id: z.string().min(1, "Выберите дело"),
   template_id: z.string().min(1, "Выберите шаблон"),
-  channel: z.enum(["whatsapp", "sms", "telegram", "email"]),
+  channel: z.enum(["chat2desk", "sms", "telegram", "email"]),
   scheduled_at: z.string().min(1, "Укажите дату и время"),
 })
 
@@ -131,8 +131,8 @@ export function CreateScheduledTaskForm({ onSuccess }: Props) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
+                  <SelectItem value="chat2desk">Chat2Desk (WhatsApp)</SelectItem>
                   <SelectItem value="sms">SMS</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
                   <SelectItem value="telegram">Telegram</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
                 </SelectContent>

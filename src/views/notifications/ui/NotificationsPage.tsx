@@ -19,6 +19,7 @@ import Link from "next/link"
 import { notificationApi } from "@/entities/notification/api/notification-api"
 import type { NotificationChannel, NotificationLogStatus } from "@/entities/notification/model/types"
 import { CreateTemplateForm } from "@/features/notifications/create-template/ui/CreateTemplateForm"
+import { BroadcastForm } from "@/features/notifications/broadcast/ui/BroadcastForm"
 import { Button } from "@/shared/components/ui/button"
 import { Badge } from "@/shared/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/shared/components/ui/card"
@@ -82,6 +83,13 @@ const channelConfig: Record<NotificationChannel, ChannelConfig> = {
     badgeCls: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300",
     iconCls:  "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400",
     cardCls:  "from-green-50/50 dark:from-green-950/20",
+  },
+  chat2desk: {
+    label:    "Chat2Desk",
+    icon:     MessageCircleIcon,
+    badgeCls: "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-300",
+    iconCls:  "bg-teal-100 text-teal-600 dark:bg-teal-900 dark:text-teal-400",
+    cardCls:  "from-teal-50/50 dark:from-teal-950/20",
   },
   telegram: {
     label:    "Telegram",
@@ -297,6 +305,7 @@ export function NotificationsPage() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="broadcast">Рассылка</TabsTrigger>
           <TabsTrigger value="logs">
             Лог отправок
             {!logsLoading && logCount > 0 && (
@@ -380,6 +389,19 @@ export function NotificationsPage() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* ── Broadcast tab ──────────────────────────────────────────── */}
+        <TabsContent value="broadcast" className="mt-4">
+          <div className="mx-auto max-w-md">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold">Массовая рассылка</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Отправьте уведомление сразу по всем активным делам
+              </p>
+            </div>
+            <BroadcastForm />
+          </div>
         </TabsContent>
 
         {/* ── Logs tab ───────────────────────────────────────────────── */}

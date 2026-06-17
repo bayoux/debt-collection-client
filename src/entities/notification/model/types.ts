@@ -1,4 +1,4 @@
-export type NotificationChannel = "whatsapp" | "sms" | "telegram" | "email"
+export type NotificationChannel = "whatsapp" | "sms" | "telegram" | "email" | "chat2desk"
 export type NotificationLogStatus = "queued" | "sent" | "delivered" | "failed"
 export type ScheduledTaskStatus = "pending" | "sent" | "cancelled" | "failed"
 
