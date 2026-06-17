@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   PlusIcon,
   UploadIcon,
@@ -15,6 +16,8 @@ import {
   SendIcon,
   BriefcaseIcon,
   ChevronRightIcon,
+  PencilIcon,
+  Trash2Icon,
 } from "lucide-react"
 import Link from "next/link"
 import { debtorApi } from "@/entities/debtor/api/debtor-api"
@@ -22,6 +25,7 @@ import type { Debtor } from "@/entities/debtor/model/types"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
 import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
 import { CreateDebtorForm } from "@/features/debtors/create/ui/CreateDebtorForm"
+import { EditDebtorForm } from "@/features/debtors/edit/ui/EditDebtorForm"
 import { ImportDebtorsForm } from "@/features/debtors/import/ui/ImportDebtorsForm"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -140,113 +144,200 @@ function DebtorSheet({
   debtor,
   open,
   onClose,
+  onDeleted,
 }: {
   debtor: Debtor | null
   open: boolean
   onClose: () => void
+  onDeleted: () => void
 }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [current, setCurrent] = useState<Debtor | null>(debtor)
+
+  // Sync current when debtor prop changes
+  if (debtor && debtor !== current && !editing) setCurrent(debtor)
+
   const { data: cases, isLoading: casesLoading } = useQuery({
-    queryKey: ["debt-cases", "debtor", debtor?.id],
-    queryFn: () => debtCaseApi.list({ debtor_id: debtor!.id, page_size: 20 }),
-    enabled: !!debtor,
+    queryKey: ["debt-cases", "debtor", current?.id],
+    queryFn: () => debtCaseApi.list({ debtor_id: current!.id, page_size: 20 }),
+    enabled: !!current,
   })
 
-  if (!debtor) return null
+  const { mutate: deleteDebtor, isPending: isDeleting } = useMutation({
+    mutationFn: () => debtorApi.delete(current!.id),
+    onSuccess: () => {
+      toast.success("Должник удалён", { description: current?.full_name })
+      qc.invalidateQueries({ queryKey: ["debtors"] })
+      setConfirmDelete(false)
+      onDeleted()
+    },
+    onError: () => toast.error("Не удалось удалить должника"),
+  })
+
+  if (!current) return null
 
   const contactRows = [
-    { icon: PhoneIcon,         label: "Телефон",  value: debtor.phone },
-    { icon: MailIcon,          label: "Email",    value: debtor.email ?? "—" },
-    { icon: MessageCircleIcon, label: "WhatsApp", value: debtor.whatsapp_number ?? "—" },
-    { icon: SendIcon,          label: "Telegram", value: debtor.telegram_id ?? "—" },
+    { icon: PhoneIcon,         label: "Телефон",  value: current.phone },
+    { icon: MailIcon,          label: "Email",    value: current.email ?? "—" },
+    { icon: MessageCircleIcon, label: "WhatsApp", value: current.whatsapp_number ?? "—" },
+    { icon: SendIcon,          label: "Telegram", value: current.telegram_id ?? "—" },
   ]
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="flex flex-col gap-0 overflow-y-auto p-0 sm:max-w-md">
-        <SheetHeader className="border-b p-5 pr-12">
-          <div className="flex items-center gap-3">
-            <Avatar name={debtor.full_name} size="lg" />
-            <div className="min-w-0">
-              <SheetTitle className="truncate">{debtor.full_name}</SheetTitle>
-              <p className="mt-0.5 text-xs text-muted-foreground">{debtor.phone}</p>
-            </div>
-          </div>
-        </SheetHeader>
-
-        {/* Contact info */}
-        <div className="border-b p-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Контакты
-          </p>
-          <div className="space-y-0 divide-y">
-            {contactRows.map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex items-center gap-3 py-2 text-sm">
-                <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
-                <span className="truncate font-medium">{value}</span>
+    <>
+      <Sheet open={open} onOpenChange={(v) => { if (!v) { setEditing(false); onClose() } }}>
+        <SheetContent className="flex flex-col gap-0 overflow-y-auto p-0 sm:max-w-md">
+          <SheetHeader className="border-b p-5 pr-12">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar name={current.full_name} size="lg" />
+                <div className="min-w-0">
+                  <SheetTitle className="truncate">{current.full_name}</SheetTitle>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{current.phone}</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Debt cases */}
-        <div className="flex-1 p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <BriefcaseIcon className="size-3.5" />
-            Дела о задолженности
-            {cases && (
-              <span className="ml-1 rounded-full bg-muted px-1.5 py-px text-[10px] font-normal normal-case text-muted-foreground">
-                {cases.count}
-              </span>
-            )}
-          </p>
-
-          {casesLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
-              ))}
+              {!editing && (
+                <div className="flex shrink-0 items-center gap-1 pt-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => setEditing(true)}
+                  >
+                    <PencilIcon className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2Icon className="size-4" />
+                  </Button>
+                </div>
+              )}
             </div>
-          ) : !cases || cases.results.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                <BriefcaseIcon className="size-4 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground">Дел не найдено</p>
+          </SheetHeader>
+
+          {editing ? (
+            <div className="p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Редактировать
+              </p>
+              <EditDebtorForm
+                debtor={current}
+                onSuccess={(updated) => { setCurrent(updated); setEditing(false) }}
+                onCancel={() => setEditing(false)}
+              />
             </div>
           ) : (
-            <div className="space-y-2">
-              {cases.results.map((c) => (
-                <Link
-                  key={c.id}
-                  href={`/debt-cases/${c.id}`}
-                  onClick={onClose}
-                  className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={`shrink-0 text-[10px] ${statusStyles[c.status]}`}
-                      >
-                        {statusLabels[c.status]}
-                      </Badge>
-                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                        DPD: {c.dpd}
-                      </span>
+            <>
+              {/* Contact info */}
+              <div className="border-b p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Контакты
+                </p>
+                <div className="space-y-0 divide-y">
+                  {contactRows.map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="flex items-center gap-3 py-2 text-sm">
+                      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+                      <span className="truncate font-medium">{value}</span>
                     </div>
-                    <div className="mt-1 font-mono tabular-nums font-medium">
-                      {c.amount.toLocaleString("ru-RU")} сом
-                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Debt cases */}
+              <div className="flex-1 p-5">
+                <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <BriefcaseIcon className="size-3.5" />
+                  Дела о задолженности
+                  {cases && (
+                    <span className="ml-1 rounded-full bg-muted px-1.5 py-px text-[10px] font-normal normal-case text-muted-foreground">
+                      {cases.count}
+                    </span>
+                  )}
+                </p>
+
+                {casesLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                    ))}
                   </div>
-                  <ChevronRightIcon className="ml-2 size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              ))}
-            </div>
+                ) : !cases || cases.results.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-8 text-center">
+                    <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                      <BriefcaseIcon className="size-4 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Дел не найдено</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {cases.results.map((c) => (
+                      <Link
+                        key={c.id}
+                        href={`/debt-cases/${c.id}`}
+                        onClick={onClose}
+                        className="flex items-center justify-between rounded-lg border p-3 text-sm transition-colors hover:bg-muted/50"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={`shrink-0 text-[10px] ${statusStyles[c.status]}`}
+                            >
+                              {statusLabels[c.status]}
+                            </Badge>
+                            <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                              DPD: {c.dpd}
+                            </span>
+                          </div>
+                          <div className="mt-1 font-mono tabular-nums font-medium">
+                            {c.amount.toLocaleString("ru-RU")} сом
+                          </div>
+                        </div>
+                        <ChevronRightIcon className="ml-2 size-4 shrink-0 text-muted-foreground" />
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
-        </div>
-      </SheetContent>
-    </Sheet>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete confirmation */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Удалить должника?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Должник{" "}
+            <span className="font-medium text-foreground">{current.full_name}</span>{" "}
+            и все связанные данные будут удалены без возможности восстановления.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isDeleting}
+              onClick={() => deleteDebtor()}
+            >
+              {isDeleting ? "Удаляем..." : "Удалить"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -489,6 +580,7 @@ export function DebtorsPage() {
         debtor={selectedDebtor}
         open={!!selectedDebtor}
         onClose={() => setSelectedDebtor(null)}
+        onDeleted={() => setSelectedDebtor(null)}
       />
     </div>
   )

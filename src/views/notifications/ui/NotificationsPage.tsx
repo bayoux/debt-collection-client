@@ -378,9 +378,11 @@ export function NotificationsPage() {
                         </TooltipTrigger>
                         <TooltipContent
                           side="bottom"
-                          className="max-w-xs whitespace-pre-wrap text-xs"
+                          className="max-w-xs text-xs"
                         >
-                          <TemplateBody body={t.body} />
+                          <p className="whitespace-pre-wrap leading-relaxed">
+                            <TemplateBody body={t.body} />
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </CardContent>

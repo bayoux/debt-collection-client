@@ -3,12 +3,18 @@
 import { useState, useRef } from "react"
 import Link from "next/link"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
-import { PlusIcon, SearchIcon, XIcon, ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
+import {
+  PlusIcon, SearchIcon, XIcon,
+  ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon,
+  MoreHorizontalIcon, PencilIcon, Trash2Icon,
+} from "lucide-react"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
 import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
-import type { DebtCaseStatus } from "@/entities/debt-case/model/types"
+import type { DebtCase, DebtCaseStatus } from "@/entities/debt-case/model/types"
 import { CreateDebtCaseForm } from "@/features/debt-cases/create/ui/CreateDebtCaseForm"
+import { EditDebtCaseForm } from "@/features/debt-cases/edit/ui/EditDebtCaseForm"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import {
@@ -18,6 +24,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -95,7 +108,10 @@ export function DebtCasesPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const qc = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<DebtCase | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DebtCase | null>(null)
   const [inputValue, setInputValue] = useState(() => searchParams.get("search") ?? "")
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>("asc")
@@ -158,6 +174,16 @@ export function DebtCasesPage() {
       setSortDir("asc")
     }
   }
+
+  const { mutate: deleteCase, isPending: isDeleting } = useMutation({
+    mutationFn: () => debtCaseApi.delete(deleteTarget!.id),
+    onSuccess: () => {
+      toast.success("Дело удалено")
+      qc.invalidateQueries({ queryKey: ["debt-cases"] })
+      setDeleteTarget(null)
+    },
+    onError: () => toast.error("Не удалось удалить дело"),
+  })
 
   const queryKey = ["debt-cases", page, status, searchFromUrl]
 
@@ -282,6 +308,7 @@ export function DebtCasesPage() {
               </TableHead>
               <TableHead>Агент</TableHead>
               <TableHead>Статус</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -297,7 +324,7 @@ export function DebtCasesPage() {
               ))
             ) : sortedResults?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                   {searchFromUrl ? `Ничего не найдено по «${searchFromUrl}»` : "Дела не найдены"}
                 </TableCell>
               </TableRow>
@@ -331,6 +358,29 @@ export function DebtCasesPage() {
                   </TableCell>
                   <TableCell>
                     <StatusCell caseId={c.id} status={c.status} queryKey={queryKey} />
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
+                          <MoreHorizontalIcon className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditTarget(c)}>
+                          <PencilIcon className="mr-2 size-3.5" />
+                          Изменить
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeleteTarget(c)}
+                        >
+                          <Trash2Icon className="mr-2 size-3.5" />
+                          Удалить
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -376,6 +426,58 @@ export function DebtCasesPage() {
           </div>
         </div>
       )}
+
+      {/* Edit dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Изменить дело</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <EditDebtCaseForm
+              debtCase={editTarget}
+              queryKey={queryKey}
+              onSuccess={() => setEditTarget(null)}
+              onCancel={() => setEditTarget(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Удалить дело?</DialogTitle>
+          </DialogHeader>
+          {deleteTarget && (
+            <p className="text-sm text-muted-foreground">
+              Дело должника{" "}
+              <span className="font-medium text-foreground">
+                {deleteTarget.debtor.full_name}
+              </span>{" "}
+              на сумму{" "}
+              <span className="font-medium text-foreground">
+                {deleteTarget.amount.toLocaleString("ru-RU")} сом
+              </span>{" "}
+              будет удалено без возможности восстановления.
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isDeleting}
+              onClick={() => deleteCase()}
+            >
+              {isDeleting ? "Удаляем..." : "Удалить"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -30,6 +30,8 @@ export const debtCaseApi = {
   update: (id: string, data: DebtCaseUpdate) =>
     apiClient.patch<DebtCase>(`/debt-cases/${id}/`, data),
 
+  delete: (id: string) => apiClient.delete<void>(`/debt-cases/${id}/`),
+
   dpdHistory: (id: string) =>
     apiClient.get<DPDSnapshot[]>(`/debt-cases/${id}/dpd-history/`),
 }
