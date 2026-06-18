@@ -10,9 +10,12 @@ import {
   UsersIcon,
   ShieldIcon,
   XIcon,
+  PencilIcon,
 } from "lucide-react"
 import { userApi } from "@/entities/user/api/user-api"
+import type { User } from "@/entities/user/model/types"
 import { CreateUserForm } from "@/features/users/create/ui/CreateUserForm"
+import { EditUserForm } from "@/features/users/edit/ui/EditUserForm"
 import { Button } from "@/shared/components/ui/button"
 import { Badge } from "@/shared/components/ui/badge"
 import { Input } from "@/shared/components/ui/input"
@@ -97,6 +100,7 @@ export function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; username: string } | null>(null)
+  const [editTarget, setEditTarget] = useState<User | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["users", page],
@@ -244,14 +248,24 @@ export function UsersPage() {
                     })}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => setDeleteTarget({ id: user.id, username: user.username })}
-                    >
-                      <Trash2Icon className="size-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => setEditTarget(user)}
+                      >
+                        <PencilIcon className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteTarget({ id: user.id, username: user.username })}
+                      >
+                        <Trash2Icon className="size-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -298,6 +312,22 @@ export function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* ── Edit dialog ────────────────────────────────────────────────── */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактировать: {editTarget?.username}</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <EditUserForm
+              user={editTarget}
+              onSuccess={() => setEditTarget(null)}
+              onCancel={() => setEditTarget(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Delete confirmation dialog ──────────────────────────────────── */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
