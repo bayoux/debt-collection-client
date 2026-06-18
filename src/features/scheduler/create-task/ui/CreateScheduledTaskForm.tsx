@@ -69,7 +69,16 @@ export function CreateScheduledTaskForm({ onSuccess }: Props) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit((v) => mutate(v))} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit((v) =>
+          mutate({
+            ...v,
+            // datetime-local returns local time with no TZ info → convert to UTC ISO
+            scheduled_at: new Date(v.scheduled_at).toISOString(),
+          })
+        )}
+        className="space-y-4"
+      >
         <FormField
           control={form.control}
           name="debt_case_id"
