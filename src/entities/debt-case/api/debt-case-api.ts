@@ -6,6 +6,7 @@ import type {
   DebtCaseUpdate,
   DPDSnapshot,
   DebtCaseStatus,
+  ImportDebtCaseResult,
 } from "../model/types"
 
 export const debtCaseApi = {
@@ -34,4 +35,10 @@ export const debtCaseApi = {
 
   dpdHistory: (id: string) =>
     apiClient.get<DPDSnapshot[]>(`/debt-cases/${id}/dpd-history/`),
+
+  import: (file: File) => {
+    const form = new FormData()
+    form.append("file", file)
+    return apiClient.post<ImportDebtCaseResult>("/debt-cases/import/", form)
+  },
 }

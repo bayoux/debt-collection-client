@@ -32,3 +32,15 @@ export interface DPDSnapshot {
   dpd_value: number
   snapshot_date: string
 }
+
+export interface ImportDebtCaseError {
+  row: number
+  field: string
+  message: string
+}
+
+export interface ImportDebtCaseResult {
+  imported: number
+  skipped: number
+  errors: ImportDebtCaseError[]
+}
