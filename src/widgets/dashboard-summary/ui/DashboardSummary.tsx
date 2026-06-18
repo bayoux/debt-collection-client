@@ -121,10 +121,22 @@ export function DashboardSummary() {
             </Badge>
           </CardAction>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="flex gap-2 font-medium">
-            Всего дел в работе
-            <BriefcaseIcon className="size-4 text-blue-400" />
+        <CardFooter className="flex-col items-start gap-2 text-sm">
+          <div className="w-full space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Просрочено</span>
+              <span className={isOverdueHigh ? "font-medium text-destructive" : "text-muted-foreground"}>
+                {data.total_open_cases > 0
+                  ? Math.round((data.total_overdue_cases / data.total_open_cases) * 100)
+                  : 0}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${isOverdueHigh ? "bg-destructive/60" : "bg-blue-400/60"}`}
+                style={{ width: `${data.total_open_cases > 0 ? Math.min(100, (data.total_overdue_cases / data.total_open_cases) * 100) : 0}%` }}
+              />
+            </div>
           </div>
           <div className="text-muted-foreground">
             {data.total_overdue_cases} из {data.total_open_cases} просрочены
@@ -162,16 +174,23 @@ export function DashboardSummary() {
             </Badge>
           </CardAction>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="flex gap-2 font-medium">
-            {isGoodRate ? "Хорошая собираемость" : "Низкая собираемость"}
-            {isGoodRate
-              ? <TrendingUpIcon className="size-4 text-emerald-400" />
-              : <TriangleAlertIcon className="size-4 text-amber-400" />
-            }
+        <CardFooter className="flex-col items-start gap-2 text-sm">
+          <div className="w-full space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Собираемость</span>
+              <span className={`font-medium ${isGoodRate ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                {data.collection_rate_percent}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${isGoodRate ? "bg-emerald-500" : "bg-amber-400"}`}
+                style={{ width: `${Math.min(100, data.collection_rate_percent)}%` }}
+              />
+            </div>
           </div>
           <div className="text-muted-foreground">
-            Процент сбора: {data.collection_rate_percent}%
+            {isGoodRate ? "Хорошая собираемость" : "Низкая собираемость"}
           </div>
         </CardFooter>
       </Card>

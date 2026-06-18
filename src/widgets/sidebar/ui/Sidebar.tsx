@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import {
   LayoutDashboardIcon,
   UsersIcon,
@@ -16,6 +17,7 @@ import {
   LogOutIcon,
 } from "lucide-react"
 import { useAuth } from "@/features/auth/model/auth-context"
+import { reportApi } from "@/entities/report/api/report-api"
 import {
   Sidebar,
   SidebarContent,
@@ -38,23 +40,40 @@ import {
 } from "@/shared/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/shared/components/ui/avatar"
 
-const navMain = [
-  { href: "/dashboard", label: "Дашборд", icon: LayoutDashboardIcon },
-  { href: "/debt-cases", label: "Дела", icon: BriefcaseIcon },
-  { href: "/debtors", label: "Должники", icon: UserCheckIcon },
-  { href: "/ptp", label: "Обещания (PTP)", icon: HandshakeIcon },
+type NavItem = { href: string; label: string; icon: React.ElementType; badge?: number }
+
+const navMain: NavItem[] = [
+  { href: "/dashboard",  label: "Дашборд",         icon: LayoutDashboardIcon },
+  { href: "/debt-cases", label: "Дела",             icon: BriefcaseIcon },
+  { href: "/debtors",    label: "Должники",         icon: UserCheckIcon },
+  { href: "/ptp",        label: "Обещания (PTP)",   icon: HandshakeIcon },
 ]
 
-const navOps = [
+const navOps: NavItem[] = [
   { href: "/notifications", label: "Уведомления", icon: BellIcon },
-  { href: "/scheduler", label: "Расписание", icon: CalendarIcon },
-  { href: "/reports", label: "Отчёты", icon: BarChart3Icon },
+  { href: "/scheduler",     label: "Расписание",  icon: CalendarIcon },
+  { href: "/reports",       label: "Отчёты",      icon: BarChart3Icon },
 ]
 
-const navAdmin = [
-  { href: "/users", label: "Пользователи", icon: UsersIcon },
-  { href: "/integrations", label: "Интеграции", icon: SettingsIcon },
+const navAdmin: NavItem[] = [
+  { href: "/users",        label: "Пользователи", icon: UsersIcon },
+  { href: "/integrations", label: "Интеграции",   icon: SettingsIcon },
 ]
+
+function NavBadge({ count, variant = "muted" }: { count: number; variant?: "danger" | "warn" | "muted" }) {
+  if (!count) return null
+  const cls =
+    variant === "danger"
+      ? "bg-destructive/15 text-destructive"
+      : variant === "warn"
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+        : "bg-muted text-muted-foreground"
+  return (
+    <span className={`ml-auto rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums ${cls}`}>
+      {count > 99 ? "99+" : count}
+    </span>
+  )
+}
 
 function NavGroup({
   label,
@@ -62,7 +81,7 @@ function NavGroup({
   pathname,
 }: {
   label: string
-  items: typeof navMain
+  items: NavItem[]
   pathname: string
 }) {
   return (
@@ -70,7 +89,7 @@ function NavGroup({
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map(({ href, label, icon: Icon }) => {
+          {items.map(({ href, label, icon: Icon, badge }) => {
             const active =
               pathname === href ||
               (href !== "/dashboard" && pathname.startsWith(href))
@@ -80,6 +99,16 @@ function NavGroup({
                   <Link href={href}>
                     <Icon />
                     <span>{label}</span>
+                    {badge !== undefined && badge > 0 && (
+                      <NavBadge
+                        count={badge}
+                        variant={
+                          href === "/debt-cases" ? "danger"
+                          : href === "/ptp" ? "warn"
+                          : "muted"
+                        }
+                      />
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -95,6 +124,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
+
+  const { data: summary } = useQuery({
+    queryKey: ["reports", "summary"],
+    queryFn: reportApi.summary,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+
+  const mainWithBadges: NavItem[] = navMain.map((item) => {
+    if (item.href === "/debt-cases") return { ...item, badge: summary?.total_overdue_cases }
+    if (item.href === "/ptp")        return { ...item, badge: summary?.ptp_pending }
+    return item
+  })
 
   const initials = user?.username?.slice(0, 2).toUpperCase() ?? "U"
 
@@ -126,7 +168,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavGroup label="Основное" items={navMain} pathname={pathname} />
+        <NavGroup label="Основное" items={mainWithBadges} pathname={pathname} />
         <NavGroup label="Операции" items={navOps} pathname={pathname} />
         <NavGroup label="Система" items={navAdmin} pathname={pathname} />
       </SidebarContent>
