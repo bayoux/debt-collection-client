@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   PlusIcon,
   MailIcon,
@@ -13,12 +13,17 @@ import {
   XCircleIcon,
   BellOffIcon,
   InboxIcon,
+  PencilIcon,
+  Trash2Icon,
+  DownloadIcon,
   type LucideIcon,
 } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { notificationApi } from "@/entities/notification/api/notification-api"
-import type { NotificationChannel, NotificationLogStatus } from "@/entities/notification/model/types"
+import type { NotificationChannel, NotificationLogStatus, NotificationTemplate } from "@/entities/notification/model/types"
 import { CreateTemplateForm } from "@/features/notifications/create-template/ui/CreateTemplateForm"
+import { EditTemplateForm } from "@/features/notifications/edit-template/ui/EditTemplateForm"
 import { BroadcastForm } from "@/features/notifications/broadcast/ui/BroadcastForm"
 import { NikitaDirectSendForm } from "@/features/notifications/nikita-direct/ui/NikitaDirectSendForm"
 import { Button } from "@/shared/components/ui/button"
@@ -223,11 +228,33 @@ function TemplateCardSkeleton() {
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
+function downloadLogsCsv(logs: ReturnType<typeof Array.prototype.map>) {
+  const rows = [
+    ["Шаблон", "Дело", "Канал", "Статус", "Отправлено"],
+    ...(logs as { template: { name: string }; debt_case_id: string; channel: string; status: string; sent_at: string | null }[]).map((l) => [
+      l.template.name,
+      l.debt_case_id,
+      l.channel,
+      l.status,
+      l.sent_at ?? "",
+    ]),
+  ]
+  const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n")
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url; a.download = "notification-logs.csv"; a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function NotificationsPage() {
-  const [createOpen, setCreateOpen] = useState(false)
-  const [logsPage,   setLogsPage]   = useState(1)
-  const [logChannel, setLogChannel] = useState<NotificationChannel | "all">("all")
-  const [logStatus,  setLogStatus]  = useState<NotificationLogStatus | "all">("all")
+  const qc = useQueryClient()
+  const [createOpen,    setCreateOpen]    = useState(false)
+  const [editTarget,    setEditTarget]    = useState<NotificationTemplate | null>(null)
+  const [deleteTarget,  setDeleteTarget]  = useState<NotificationTemplate | null>(null)
+  const [logsPage,      setLogsPage]      = useState(1)
+  const [logChannel,    setLogChannel]    = useState<NotificationChannel | "all">("all")
+  const [logStatus,     setLogStatus]     = useState<NotificationLogStatus | "all">("all")
 
   const {
     data: templates,
@@ -236,6 +263,16 @@ export function NotificationsPage() {
   } = useQuery({
     queryKey: ["notification-templates"],
     queryFn: () => notificationApi.templates.list(),
+  })
+
+  const { mutate: deleteTemplate, isPending: isDeleting } = useMutation({
+    mutationFn: (id: string) => notificationApi.templates.delete(id),
+    onSuccess: () => {
+      toast.success("Шаблон удалён", { description: deleteTarget?.name })
+      qc.invalidateQueries({ queryKey: ["notification-templates"] })
+      setDeleteTarget(null)
+    },
+    onError: () => toast.error("Не удалось удалить шаблон"),
   })
 
   const {
@@ -354,16 +391,28 @@ export function NotificationsPage() {
                           <Icon className="size-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start justify-between gap-1">
                             <span className="text-sm font-medium leading-tight">
                               {t.name}
                             </span>
-                            <Badge
-                              variant="outline"
-                              className="shrink-0 text-[10px] border-border/60 bg-muted/60 text-muted-foreground"
-                            >
-                              {t.language.toUpperCase()}
-                            </Badge>
+                            <div className="flex shrink-0 items-center gap-0.5">
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-6 text-muted-foreground hover:text-foreground"
+                                onClick={() => setEditTarget(t)}
+                              >
+                                <PencilIcon className="size-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-6 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget(t)}
+                              >
+                                <Trash2Icon className="size-3.5" />
+                              </Button>
+                            </div>
                           </div>
                           <div className="mt-1">
                             <ChannelBadge channel={t.channel} />
@@ -424,8 +473,8 @@ export function NotificationsPage() {
         {/* ── Logs tab ───────────────────────────────────────────────── */}
         <TabsContent value="logs" className="mt-4 space-y-3">
 
-          {/* Filters */}
-          <div className="flex flex-wrap gap-2">
+          {/* Filters + export */}
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={logChannel} onValueChange={handleLogChannel}>
               <SelectTrigger className="h-8 w-44 text-sm">
                 <SelectValue placeholder="Все каналы" />
@@ -465,6 +514,16 @@ export function NotificationsPage() {
                 Сбросить
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 ml-auto"
+              disabled={!logs?.results.length}
+              onClick={() => logs && downloadLogsCsv(logs.results)}
+            >
+              <DownloadIcon className="mr-1.5 size-3.5" />
+              CSV
+            </Button>
           </div>
 
           <div className="rounded-lg border">
@@ -584,6 +643,49 @@ export function NotificationsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ── Edit template dialog ────────────────────────────────────────── */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактировать шаблон</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <EditTemplateForm
+              template={editTarget}
+              onSuccess={() => setEditTarget(null)}
+              onCancel={() => setEditTarget(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete template confirmation ────────────────────────────────── */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Удалить шаблон?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Шаблон{" "}
+            <span className="font-medium text-foreground">{deleteTarget?.name}</span>{" "}
+            будет удалён без возможности восстановления.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isDeleting}
+              onClick={() => deleteTarget && deleteTemplate(deleteTarget.id)}
+            >
+              {isDeleting ? "Удаляем..." : "Удалить"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -9,8 +9,10 @@ import {
   PlusIcon, SearchIcon, XIcon,
   ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon,
   MoreHorizontalIcon, PencilIcon, Trash2Icon,
+  DownloadIcon, FilterXIcon,
 } from "lucide-react"
 import { debtCaseApi } from "@/entities/debt-case/api/debt-case-api"
+import { userApi } from "@/entities/user/api/user-api"
 import { statusLabels, statusStyles } from "@/entities/debt-case/model/status"
 import type { DebtCase, DebtCaseStatus } from "@/entities/debt-case/model/types"
 import { CreateDebtCaseForm } from "@/features/debt-cases/create/ui/CreateDebtCaseForm"
@@ -102,6 +104,27 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey | 
     : <ArrowDownIcon className="ml-1 inline size-3.5 text-foreground" />
 }
 
+function exportCsv(cases: DebtCase[]) {
+  const rows = [
+    ["Должник", "Телефон", "Сумма", "DPD", "Дата погашения", "Агент", "Статус"],
+    ...cases.map((c) => [
+      c.debtor.full_name,
+      c.debtor.phone ?? "",
+      String(c.amount),
+      String(c.dpd),
+      c.due_date,
+      c.assigned_agent?.username ?? "",
+      statusLabels[c.status] ?? c.status,
+    ]),
+  ]
+  const csv = rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n")
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url; a.download = "debt-cases.csv"; a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export function DebtCasesPage() {
@@ -109,21 +132,35 @@ export function DebtCasesPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const qc = useQueryClient()
-  const [createOpen, setCreateOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<DebtCase | null>(null)
+  const [createOpen,  setCreateOpen]  = useState(false)
+  const [editTarget,  setEditTarget]  = useState<DebtCase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DebtCase | null>(null)
-  const [inputValue, setInputValue] = useState(() => searchParams.get("search") ?? "")
+  const [isExporting, setIsExporting] = useState(false)
+
+  // Local input states (debounced to URL)
+  const [inputValue,   setInputValue]   = useState(() => searchParams.get("search") ?? "")
+  const [dpdMinInput,  setDpdMinInput]  = useState(() => searchParams.get("dpd_min") ?? "")
+  const [dpdMaxInput,  setDpdMaxInput]  = useState(() => searchParams.get("dpd_max") ?? "")
+
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>("asc")
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const page   = Math.max(1, Number(searchParams.get("page") ?? "1"))
-  const status = (searchParams.get("status") as DebtCaseStatus | "all") ?? "all"
+  const debounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dpdDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const page         = Math.max(1, Number(searchParams.get("page") ?? "1"))
+  const status       = (searchParams.get("status") as DebtCaseStatus | "all") ?? "all"
+  const agentId      = searchParams.get("agent") ?? "all"
   const searchFromUrl = searchParams.get("search") ?? ""
+  const dpdMinUrl    = searchParams.get("dpd_min") ?? ""
+  const dpdMaxUrl    = searchParams.get("dpd_max") ?? ""
+
+  // Detect active filters for reset button
+  const hasFilters = status !== "all" || agentId !== "all" || dpdMinUrl || dpdMaxUrl || searchFromUrl
 
   function setParam(key: string, value: string | null) {
     const params = new URLSearchParams(searchParams.toString())
-    if (value === null || value === "all") {
+    if (value === null || value === "all" || value === "") {
       params.delete(key)
     } else {
       params.set(key, value)
@@ -134,11 +171,7 @@ export function DebtCasesPage() {
 
   function setPage(next: number) {
     const params = new URLSearchParams(searchParams.toString())
-    if (next === 1) {
-      params.delete("page")
-    } else {
-      params.set("page", String(next))
-    }
+    if (next === 1) { params.delete("page") } else { params.set("page", String(next)) }
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
@@ -148,14 +181,17 @@ export function DebtCasesPage() {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString())
-      if (value) {
-        params.set("search", value)
-      } else {
-        params.delete("search")
-      }
+      if (value) { params.set("search", value) } else { params.delete("search") }
       params.delete("page")
       router.push(`${pathname}?${params.toString()}`, { scroll: false })
     }, 400)
+  }
+
+  function handleDpdInput(field: "dpd_min" | "dpd_max", value: string) {
+    if (field === "dpd_min") setDpdMinInput(value)
+    else setDpdMaxInput(value)
+    if (dpdDebounceRef.current) clearTimeout(dpdDebounceRef.current)
+    dpdDebounceRef.current = setTimeout(() => setParam(field, value || null), 500)
   }
 
   function clearSearch() {
@@ -164,6 +200,13 @@ export function DebtCasesPage() {
     params.delete("search")
     params.delete("page")
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function clearAllFilters() {
+    setInputValue("")
+    setDpdMinInput("")
+    setDpdMaxInput("")
+    router.push(pathname, { scroll: false })
   }
 
   function toggleSort(key: SortKey) {
@@ -185,7 +228,7 @@ export function DebtCasesPage() {
     onError: () => toast.error("Не удалось удалить дело"),
   })
 
-  const queryKey = ["debt-cases", page, status, searchFromUrl]
+  const queryKey = ["debt-cases", page, status, searchFromUrl, agentId, dpdMinUrl, dpdMaxUrl]
 
   const { data, isLoading, error } = useQuery({
     queryKey,
@@ -195,7 +238,16 @@ export function DebtCasesPage() {
         page_size: 20,
         status: status === "all" ? undefined : status,
         search: searchFromUrl || undefined,
+        assigned_agent_id: agentId !== "all" ? agentId : undefined,
+        dpd_min: dpdMinUrl ? Number(dpdMinUrl) : undefined,
+        dpd_max: dpdMaxUrl ? Number(dpdMaxUrl) : undefined,
       }),
+  })
+
+  const { data: agentsData } = useQuery({
+    queryKey: ["users", "all-agents"],
+    queryFn: () => userApi.list({ page_size: 200 }),
+    staleTime: 5 * 60 * 1000,
   })
 
   const totalPages = data ? Math.ceil(data.count / 20) : 1
@@ -211,6 +263,26 @@ export function DebtCasesPage() {
       })
     : data?.results
 
+  async function handleExport() {
+    setIsExporting(true)
+    try {
+      const all = await debtCaseApi.list({
+        page_size: 9999,
+        status: status === "all" ? undefined : status,
+        search: searchFromUrl || undefined,
+        assigned_agent_id: agentId !== "all" ? agentId : undefined,
+        dpd_min: dpdMinUrl ? Number(dpdMinUrl) : undefined,
+        dpd_max: dpdMaxUrl ? Number(dpdMaxUrl) : undefined,
+      })
+      exportCsv(all.results)
+      toast.success(`Экспортировано ${all.results.length} дел`)
+    } catch {
+      toast.error("Не удалось экспортировать")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {error && <QueryError error={error} />}
@@ -222,24 +294,37 @@ export function DebtCasesPage() {
             {data ? `Всего: ${data.count}` : "Загрузка..."}
           </p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusIcon className="mr-1.5 size-4" />
-              Создать дело
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Новое дело</DialogTitle>
-            </DialogHeader>
-            <CreateDebtCaseForm onSuccess={() => setCreateOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isExporting || !data?.count}
+            onClick={handleExport}
+          >
+            <DownloadIcon className="mr-1.5 size-3.5" />
+            {isExporting ? "Экспорт..." : "CSV"}
+          </Button>
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusIcon className="mr-1.5 size-4" />
+                Создать дело
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Новое дело</DialogTitle>
+              </DialogHeader>
+              <CreateDebtCaseForm onSuccess={() => setCreateOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
+      {/* ── Filters ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
-        <div className="relative max-w-sm flex-1 sm:flex-none sm:w-64">
+        {/* Search */}
+        <div className="relative max-w-sm flex-1 sm:flex-none sm:w-56">
           <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <Input
             placeholder="Поиск по должнику..."
@@ -257,8 +342,10 @@ export function DebtCasesPage() {
             </button>
           )}
         </div>
+
+        {/* Status */}
         <Select value={status} onValueChange={(v) => setParam("status", v)}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-44">
             <SelectValue placeholder="Все статусы" />
           </SelectTrigger>
           <SelectContent>
@@ -272,6 +359,56 @@ export function DebtCasesPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Agent */}
+        <Select value={agentId} onValueChange={(v) => setParam("agent", v)}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Все агенты" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все агенты</SelectItem>
+            {agentsData?.results.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.username}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* DPD range */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground shrink-0">DPD:</span>
+          <Input
+            type="number"
+            min={0}
+            placeholder="от"
+            value={dpdMinInput}
+            onChange={(e) => handleDpdInput("dpd_min", e.target.value)}
+            className="h-9 w-16 text-sm text-center"
+          />
+          <span className="text-muted-foreground text-xs">—</span>
+          <Input
+            type="number"
+            min={0}
+            placeholder="до"
+            value={dpdMaxInput}
+            onChange={(e) => handleDpdInput("dpd_max", e.target.value)}
+            className="h-9 w-16 text-sm text-center"
+          />
+        </div>
+
+        {/* Reset filters */}
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 text-muted-foreground"
+            onClick={clearAllFilters}
+          >
+            <FilterXIcon className="mr-1 size-3.5" />
+            Сбросить
+          </Button>
+        )}
       </div>
 
       <div className="rounded-lg border">
@@ -325,7 +462,7 @@ export function DebtCasesPage() {
             ) : sortedResults?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                  {searchFromUrl ? `Ничего не найдено по «${searchFromUrl}»` : "Дела не найдены"}
+                  {hasFilters ? "Ничего не найдено по заданным фильтрам" : "Дела не найдены"}
                 </TableCell>
               </TableRow>
             ) : (
