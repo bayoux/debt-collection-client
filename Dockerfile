@@ -3,17 +3,25 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
+# ── Install dependencies ─────────────────────────────────────────────────────
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
+# ── Build ────────────────────────────────────────────────────────────────────
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# NEXT_PUBLIC_* vars are inlined at build time — must be passed as ARG
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN pnpm build
 
+# ── Production runner ────────────────────────────────────────────────────────
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
