@@ -20,6 +20,7 @@ import { notificationApi } from "@/entities/notification/api/notification-api"
 import type { NotificationChannel, NotificationLogStatus } from "@/entities/notification/model/types"
 import { CreateTemplateForm } from "@/features/notifications/create-template/ui/CreateTemplateForm"
 import { BroadcastForm } from "@/features/notifications/broadcast/ui/BroadcastForm"
+import { NikitaDirectSendForm } from "@/features/notifications/nikita-direct/ui/NikitaDirectSendForm"
 import { Button } from "@/shared/components/ui/button"
 import { Badge } from "@/shared/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/shared/components/ui/card"
@@ -306,6 +307,7 @@ export function NotificationsPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="broadcast">Рассылка</TabsTrigger>
+          <TabsTrigger value="nikita">SMS (Nikita)</TabsTrigger>
           <TabsTrigger value="logs">
             Лог отправок
             {!logsLoading && logCount > 0 && (
@@ -403,6 +405,19 @@ export function NotificationsPage() {
               </p>
             </div>
             <BroadcastForm />
+          </div>
+        </TabsContent>
+
+        {/* ── Nikita SMS tab ─────────────────────────────────────────── */}
+        <TabsContent value="nikita" className="mt-4">
+          <div className="mx-auto max-w-md">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold">Прямая отправка SMS</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Отправить SMS напрямую через Nikita SMSPro (nikita.kg)
+              </p>
+            </div>
+            <NikitaDirectSendForm />
           </div>
         </TabsContent>
 
