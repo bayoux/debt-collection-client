@@ -57,27 +57,32 @@ function userFromToken(token: string): AuthUser | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Start with isLoading=true so server and client render identically on first
-  // pass (both show skeleton). useLayoutEffect runs only on the client,
-  // resolves auth from localStorage before paint, and sets the real state.
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // One-time mount init from localStorage. localStorage is unavailable on the
-  // server, so we start with isLoading=true (identical on server and client)
-  // and resolve auth before first paint via useLayoutEffect.
-  /* eslint-disable react-hooks/set-state-in-effect */
   useLayoutEffect(() => {
     const token = apiClient.getAccessToken()
     if (!token || isTokenExpired(token)) {
       apiClient.clearTokens()
       setUser(null)
-    } else {
-      setUser(userFromToken(token))
+      setIsLoading(false)
+      return
     }
-    setIsLoading(false)
+
+    // Set from token immediately so the UI renders without a flash
+    setUser(userFromToken(token))
+
+    // Then refresh with accurate server data
+    apiClient
+      .get<AuthUser>("/auth/me/")
+      .then(setUser)
+      .catch(() => {
+        // If /auth/me/ fails (e.g. revoked token), clear session
+        apiClient.clearTokens()
+        setUser(null)
+      })
+      .finally(() => setIsLoading(false))
   }, [])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const login = useCallback(async (username: string, password: string) => {
     const { access, refresh } = await apiClient.post<{
@@ -85,7 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refresh: string
     }>("/auth/login/", { username, password })
     apiClient.setTokens(access, refresh)
-    setUser(userFromToken(access) ?? { id: "", username, email: "" })
+
+    // Fetch real user data from server after login
+    try {
+      const me = await apiClient.get<AuthUser>("/auth/me/")
+      setUser(me)
+    } catch {
+      setUser(userFromToken(access) ?? { id: "", username, email: "" })
+    }
   }, [])
 
   const logout = useCallback(async () => {

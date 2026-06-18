@@ -42,6 +42,7 @@ import {
 } from "@/shared/components/ui/table"
 import { Skeleton } from "@/shared/components/ui/skeleton"
 import { useState } from "react"
+import type { ScheduledTask } from "@/entities/notification/model/types"
 
 // ─── config ───────────────────────────────────────────────────────────────────
 
@@ -160,6 +161,7 @@ export function SchedulerPage() {
   const pathname     = usePathname()
   const searchParams = useSearchParams()
   const [createOpen, setCreateOpen] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<ScheduledTask | null>(null)
 
   const page       = Math.max(1, Number(searchParams.get("page") ?? "1"))
   const taskStatus = (searchParams.get("status") ?? "all") as ScheduledTaskStatus | "all"
@@ -189,11 +191,12 @@ export function SchedulerPage() {
       }),
   })
 
-  const { mutate: cancelTask } = useMutation({
+  const { mutate: cancelTask, isPending: isCancelling } = useMutation({
     mutationFn: notificationApi.scheduler.cancel,
     onSuccess: () => {
       toast.success("Задача отменена")
       qc.invalidateQueries({ queryKey: ["scheduled-tasks"] })
+      setCancelTarget(null)
     },
     onError: () => toast.error("Не удалось отменить задачу"),
   })
@@ -314,7 +317,7 @@ export function SchedulerPage() {
                           variant="outline"
                           size="sm"
                           className="h-7 gap-1.5 text-destructive hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:hover:border-red-800 dark:hover:bg-red-950 dark:hover:text-red-300"
-                          onClick={() => cancelTask(task.id)}
+                          onClick={() => setCancelTarget(task)}
                         >
                           <CircleXIcon className="size-3.5" />
                           Отменить
@@ -369,6 +372,35 @@ export function SchedulerPage() {
           </div>
         </div>
       )}
+
+      {/* ── Cancel confirmation ─────────────────────────────────────────── */}
+      <Dialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Отменить задачу?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Задача{" "}
+            <span className="font-medium text-foreground">
+              {cancelTarget?.template.name}
+            </span>{" "}
+            будет отменена и не будет отправлена.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setCancelTarget(null)}>
+              Назад
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isCancelling}
+              onClick={() => cancelTarget && cancelTask(cancelTarget.id)}
+            >
+              {isCancelling ? "Отменяем..." : "Да, отменить"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

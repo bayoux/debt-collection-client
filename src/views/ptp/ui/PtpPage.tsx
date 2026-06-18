@@ -11,13 +11,22 @@ import {
   ClockIcon,
   CheckCircle2Icon,
   XCircleIcon,
+  PlusIcon,
   type LucideIcon,
 } from "lucide-react"
 import { ptpApi } from "@/entities/ptp/api/ptp-api"
 import type { PTPStatus, PTPRecord } from "@/entities/ptp/model/types"
+import { CreatePtpForm } from "@/features/ptp/create/ui/CreatePtpForm"
 import { Button } from "@/shared/components/ui/button"
 import { Badge } from "@/shared/components/ui/badge"
 import { QueryError } from "@/shared/components/ui/query-error"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/shared/components/ui/dialog"
 import {
   Table,
   TableBody,
@@ -27,6 +36,7 @@ import {
   TableRow,
 } from "@/shared/components/ui/table"
 import { Skeleton } from "@/shared/components/ui/skeleton"
+import { useState } from "react"
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -181,6 +191,7 @@ export function PtpPage() {
   const pathname     = usePathname()
   const searchParams = useSearchParams()
   const qc           = useQueryClient()
+  const [createOpen, setCreateOpen] = useState(false)
 
   const page   = Math.max(1, Number(searchParams.get("page") ?? "1"))
   const status = (searchParams.get("status") ?? "all") as PTPStatus | "all"
@@ -240,6 +251,20 @@ export function PtpPage() {
             {data ? `${data.count.toLocaleString("ru-RU")} записей` : "Загрузка..."}
           </p>
         </div>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm">
+              <PlusIcon className="mr-1.5 size-3.5" />
+              Добавить PTP
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Новое обещание об оплате</DialogTitle>
+            </DialogHeader>
+            <CreatePtpForm onSuccess={() => setCreateOpen(false)} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* ── Filter tabs ────────────────────────────────────────────────── */}

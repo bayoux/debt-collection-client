@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useRef, useMemo } from "react"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -11,6 +12,7 @@ import {
   ShieldIcon,
   XIcon,
   PencilIcon,
+  ChevronRightIcon,
 } from "lucide-react"
 import { userApi } from "@/entities/user/api/user-api"
 import type { User } from "@/entities/user/model/types"
@@ -30,6 +32,12 @@ import {
   DialogTrigger,
 } from "@/shared/components/ui/dialog"
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/shared/components/ui/sheet"
+import {
   Table,
   TableBody,
   TableCell,
@@ -38,7 +46,7 @@ import {
   TableRow,
 } from "@/shared/components/ui/table"
 
-// ─── role colors (cycled by role name hash) ──────────────────────────────────
+// ─── role colors ──────────────────────────────────────────────────────────────
 
 const rolePalette = [
   "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300",
@@ -49,18 +57,6 @@ const rolePalette = [
   "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300",
 ]
 
-function roleColor(name: string) {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
-  return rolePalette[Math.abs(hash) % rolePalette.length]
-}
-
-function getInitials(username: string) {
-  const parts = username.split(/[._-]/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return username.slice(0, 2).toUpperCase()
-}
-
 const avatarBg = [
   "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
   "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
@@ -70,62 +66,241 @@ const avatarBg = [
   "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300",
 ]
 
-function avatarColor(username: string) {
-  let hash = 0
-  for (let i = 0; i < username.length; i++) hash = (hash * 31 + username.charCodeAt(i)) | 0
-  return avatarBg[Math.abs(hash) % avatarBg.length]
+function hashStr(s: string) {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
+  return Math.abs(h)
 }
 
-// ─── sub-components ───────────────────────────────────────────────────────────
+function roleColor(name: string) { return rolePalette[hashStr(name) % rolePalette.length] }
+function avatarColor(name: string) { return avatarBg[hashStr(name) % avatarBg.length] }
 
-function EmptyState({ title, description }: { title: string; description: string }) {
+function getInitials(username: string) {
+  const parts = username.split(/[._-]/)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return username.slice(0, 2).toUpperCase()
+}
+
+// ─── UserSheet ────────────────────────────────────────────────────────────────
+
+function UserSheet({
+  user,
+  open,
+  onClose,
+  onDeleted,
+}: {
+  user: User | null
+  open: boolean
+  onClose: () => void
+  onDeleted: () => void
+}) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [current, setCurrent] = useState<User | null>(user)
+
+  if (user && user !== current && !editing) setCurrent(user)
+
+  const { mutate: deleteUser, isPending: isDeleting } = useMutation({
+    mutationFn: () => userApi.delete(current!.id),
+    onSuccess: () => {
+      toast.success("Пользователь удалён", { description: current?.username })
+      qc.invalidateQueries({ queryKey: ["users"] })
+      setConfirmDelete(false)
+      onDeleted()
+    },
+    onError: () => toast.error("Не удалось удалить пользователя"),
+  })
+
+  if (!current) return null
+
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-        <UsersIcon className="size-5 text-muted-foreground" />
-      </div>
-      <div>
-        <p className="text-sm font-medium">{title}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-    </div>
+    <>
+      <Sheet open={open} onOpenChange={(v) => { if (!v) { setEditing(false); onClose() } }}>
+        <SheetContent className="flex flex-col gap-0 overflow-y-auto p-0 sm:max-w-md">
+          <SheetHeader className="border-b p-5 pr-12">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="size-12 shrink-0">
+                  <AvatarFallback className={`text-sm font-semibold ${avatarColor(current.username)}`}>
+                    {getInitials(current.username)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <SheetTitle className="truncate">{current.username}</SheetTitle>
+                  <p className="mt-0.5 text-xs text-muted-foreground truncate">{current.email}</p>
+                </div>
+              </div>
+              {!editing && (
+                <div className="flex shrink-0 items-center gap-1 pt-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => setEditing(true)}
+                  >
+                    <PencilIcon className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2Icon className="size-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </SheetHeader>
+
+          {editing ? (
+            <div className="p-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Редактировать
+              </p>
+              <EditUserForm
+                user={current}
+                onSuccess={() => { qc.invalidateQueries({ queryKey: ["users"] }); setEditing(false) }}
+                onCancel={() => setEditing(false)}
+              />
+            </div>
+          ) : (
+            <div className="p-5 space-y-5">
+              {/* Info */}
+              <div>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Аккаунт
+                </p>
+                <div className="divide-y rounded-lg border">
+                  <div className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                    <span className="w-20 shrink-0 text-muted-foreground">Логин</span>
+                    <span className="font-medium">{current.username}</span>
+                  </div>
+                  <div className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                    <span className="w-20 shrink-0 text-muted-foreground">Email</span>
+                    <span className="font-medium truncate">{current.email}</span>
+                  </div>
+                  <div className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                    <span className="w-20 shrink-0 text-muted-foreground">Создан</span>
+                    <span className="text-muted-foreground">
+                      {new Date(current.created_at).toLocaleDateString("ru-RU", {
+                        day: "numeric", month: "long", year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Roles */}
+              <div>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Роли
+                </p>
+                {current.roles.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm text-muted-foreground">
+                    <ShieldIcon className="size-3.5" />
+                    Нет назначенных ролей
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {current.roles.map((role) => (
+                      <Badge key={role.id} variant="outline" className={roleColor(role.name)}>
+                        {role.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Удалить пользователя?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Пользователь{" "}
+            <span className="font-medium text-foreground">{current.username}</span>{" "}
+            будет удалён без возможности восстановления.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isDeleting}
+              onClick={() => deleteUser()}
+            >
+              {isDeleting ? "Удаляем..." : "Удалить"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 20
+
 export function UsersPage() {
-  const qc = useQueryClient()
-  const [page, setPage] = useState(1)
+  const router       = useRouter()
+  const pathname     = usePathname()
+  const searchParams = useSearchParams()
   const [createOpen, setCreateOpen] = useState(false)
-  const [search, setSearch] = useState("")
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; username: string } | null>(null)
-  const [editTarget, setEditTarget] = useState<User | null>(null)
+  const [selected, setSelected] = useState<User | null>(null)
+  const [page, setPage] = useState(1)
+  const [inputValue, setInputValue] = useState(() => searchParams.get("search") ?? "")
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const searchFromUrl = searchParams.get("search") ?? ""
+
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setInputValue(value)
+    setPage(1)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (value) params.set("search", value)
+      else params.delete("search")
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    }, 350)
+  }
+
+  function clearSearch() {
+    setInputValue("")
+    setPage(1)
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("search")
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  // Load all users at once for client-side filtering (admin panel, typically <500 users)
   const { data, isLoading, error } = useQuery({
-    queryKey: ["users", page],
-    queryFn: () => userApi.list({ page, page_size: 20 }),
-  })
-
-  const { mutate: deleteUser, isPending: isDeleting } = useMutation({
-    mutationFn: userApi.delete,
-    onSuccess: () => {
-      toast.success("Пользователь удалён", { description: deleteTarget?.username })
-      qc.invalidateQueries({ queryKey: ["users"] })
-      setDeleteTarget(null)
-    },
-    onError: () => toast.error("Не удалось удалить пользователя"),
+    queryKey: ["users"],
+    queryFn: () => userApi.list({ page_size: 9999 }),
   })
 
   const filtered = useMemo(() => {
-    if (!data?.results || !search.trim()) return data?.results
-    const q = search.toLowerCase()
+    if (!data?.results) return []
+    if (!searchFromUrl.trim()) return data.results
+    const q = searchFromUrl.toLowerCase()
     return data.results.filter(
       (u) => u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
     )
-  }, [data?.results, search])
+  }, [data?.results, searchFromUrl])
 
-  const totalPages = data ? Math.ceil(data.count / 20) : 1
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pageSlice = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   return (
     <div className="space-y-4">
@@ -136,7 +311,11 @@ export function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Пользователи</h1>
           <p className="text-sm text-muted-foreground">
-            {data ? `Всего: ${data.count}` : "Загрузка..."}
+            {data
+              ? searchFromUrl
+                ? `${filtered.length} из ${data.count}`
+                : `Всего: ${data.count}`
+              : "Загрузка..."}
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -159,14 +338,14 @@ export function UsersPage() {
       <div className="relative max-w-sm">
         <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground pointer-events-none" />
         <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={inputValue}
+          onChange={handleSearchChange}
           placeholder="Поиск по логину или email..."
           className="pl-8 h-9 text-sm"
         />
-        {search && (
+        {inputValue && (
           <button
-            onClick={() => setSearch("")}
+            onClick={clearSearch}
             className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
           >
             <XIcon className="size-4" />
@@ -183,7 +362,7 @@ export function UsersPage() {
               <TableHead>Email</TableHead>
               <TableHead>Роли</TableHead>
               <TableHead>Создан</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -199,24 +378,37 @@ export function UsersPage() {
                   {Array.from({ length: 3 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>
                   ))}
-                  <TableCell><Skeleton className="h-7 w-7 rounded-md" /></TableCell>
+                  <TableCell />
                 </TableRow>
               ))
-            ) : filtered?.length === 0 ? (
+            ) : pageSlice.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="p-0">
-                  <EmptyState
-                    title={search ? "Ничего не найдено" : "Пользователи не найдены"}
-                    description={search ? "Попробуйте изменить запрос" : "Добавьте первого пользователя"}
-                  />
+                <TableCell colSpan={5}>
+                  <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+                      <UsersIcon className="size-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {searchFromUrl ? "Ничего не найдено" : "Пользователи не найдены"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {searchFromUrl ? "Попробуйте изменить запрос" : "Добавьте первого пользователя"}
+                      </p>
+                    </div>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
-              filtered?.map((user) => (
-                <TableRow key={user.id} className="transition-colors duration-150 hover:bg-primary/5">
+              pageSlice.map((user) => (
+                <TableRow
+                  key={user.id}
+                  className="cursor-pointer transition-colors duration-150 hover:bg-primary/5"
+                  onClick={() => setSelected(user)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-2.5">
-                      <Avatar size="sm">
+                      <Avatar className="size-8 shrink-0">
                         <AvatarFallback className={`text-[10px] font-semibold ${avatarColor(user.username)}`}>
                           {getInitials(user.username)}
                         </AvatarFallback>
@@ -242,30 +434,11 @@ export function UsersPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString("ru-RU", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
+                      day: "numeric", month: "short", year: "numeric",
                     })}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditTarget(user)}
-                      >
-                        <PencilIcon className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteTarget({ id: user.id, username: user.username })}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </div>
+                    <ChevronRightIcon className="size-4 text-muted-foreground/40" />
                   </TableCell>
                 </TableRow>
               ))
@@ -275,17 +448,17 @@ export function UsersPage() {
       </div>
 
       {/* ── Pagination ─────────────────────────────────────────────────── */}
-      {data && data.count > 20 && (
+      {filtered.length > PAGE_SIZE && (
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Страница {page} из {totalPages}
+            Страница {safePage} из {totalPages}
           </span>
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={!data.previous}
+              disabled={safePage === 1}
             >
               Назад
             </Button>
@@ -293,7 +466,7 @@ export function UsersPage() {
               Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <Button
                   key={p}
-                  variant={p === page ? "default" : "outline"}
+                  variant={p === safePage ? "default" : "outline"}
                   size="sm"
                   className="w-8"
                   onClick={() => setPage(p)}
@@ -305,7 +478,7 @@ export function UsersPage() {
               variant="outline"
               size="sm"
               onClick={() => setPage((p) => p + 1)}
-              disabled={!data.next}
+              disabled={safePage >= totalPages}
             >
               Вперёд
             </Button>
@@ -313,46 +486,13 @@ export function UsersPage() {
         </div>
       )}
 
-      {/* ── Edit dialog ────────────────────────────────────────────────── */}
-      <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Редактировать: {editTarget?.username}</DialogTitle>
-          </DialogHeader>
-          {editTarget && (
-            <EditUserForm
-              user={editTarget}
-              onSuccess={() => setEditTarget(null)}
-              onCancel={() => setEditTarget(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Delete confirmation dialog ──────────────────────────────────── */}
-      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Удалить пользователя?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Пользователь <span className="font-medium text-foreground">{deleteTarget?.username}</span> будет удалён без возможности восстановления.
-          </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
-              Отмена
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={isDeleting}
-              onClick={() => deleteTarget && deleteUser(deleteTarget.id)}
-            >
-              {isDeleting ? "Удаляем..." : "Удалить"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ── User sheet ─────────────────────────────────────────────────── */}
+      <UserSheet
+        user={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        onDeleted={() => setSelected(null)}
+      />
     </div>
   )
 }

@@ -3,11 +3,13 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { userApi } from "@/entities/user/api/user-api"
+import { roleApi } from "@/entities/role/api/role-api"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { Checkbox } from "@/shared/components/ui/checkbox"
 import {
   Form,
   FormControl,
@@ -21,6 +23,7 @@ const schema = z.object({
   username: z.string().min(3, "Минимум 3 символа"),
   email: z.string().email("Неверный email"),
   password: z.string().min(6, "Минимум 6 символов"),
+  role_ids: z.array(z.string()),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -31,6 +34,12 @@ interface Props {
 
 export function CreateUserForm({ onSuccess }: Props) {
   const qc = useQueryClient()
+
+  const { data: roles = [] } = useQuery({
+    queryKey: ["roles"],
+    queryFn: roleApi.list,
+  })
+
   const { mutate, isPending } = useMutation({
     mutationFn: userApi.create,
     onSuccess: (user) => {
@@ -43,7 +52,7 @@ export function CreateUserForm({ onSuccess }: Props) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { username: "", email: "", password: "" },
+    defaultValues: { username: "", email: "", password: "", role_ids: [] },
   })
 
   return (
@@ -88,6 +97,40 @@ export function CreateUserForm({ onSuccess }: Props) {
             </FormItem>
           )}
         />
+        {roles.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Роли</p>
+            {roles.map((role) => (
+              <FormField
+                key={role.id}
+                control={form.control}
+                name="role_ids"
+                render={({ field }) => (
+                  <FormItem className="flex items-start gap-2.5 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value.includes(role.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            field.onChange([...field.value, role.id])
+                          } else {
+                            field.onChange(field.value.filter((id) => id !== role.id))
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <div>
+                      <p className="text-sm font-medium leading-none">{role.name}</p>
+                      {role.description && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">{role.description}</p>
+                      )}
+                    </div>
+                  </FormItem>
+                )}
+              />
+            ))}
+          </div>
+        )}
         <Button type="submit" disabled={isPending} className="w-full">
           {isPending ? "Создаём..." : "Создать пользователя"}
         </Button>
